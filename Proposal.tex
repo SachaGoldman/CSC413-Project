@@ -25,11 +25,13 @@
   University of Toronto\\
   Toronto, ON M5S 1A1 \\
   \texttt{sacha.goldman@mail.utoronto.ca} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
+  \And
+  Yuchong Zhang \\
+  Department of Computer Science \\
+  Department of Mathematics \\
+  University of Toronoto \\
+  Toronto, ON, M5S 1A1 \\
+  \texttt{yuchongz.zhang@mail.utoronto.ca} \\
   % \And
   % Coauthor \\
   % Affiliation \\
@@ -46,11 +48,20 @@
 \end{abstract}
 
 \section{Introduction}
-Style transfer is the problem of changing an image's artistic style while maintaining its ``content'', namely the object it depicts. Conventional models use CNN to extract features from an image, take in another image indicating the desired artistic style, and attempt to apply that style to the features of the original input image. However, it has been shown that due to the locality resulting from shared weights, CNN struggles to capture global information of input images and suffers from feature losses \cite{ImageStyleTransformer}. To resolve these issues, models that use Transformers instead of CNN for feature and style extraction have been proposed and shown improved results \cite{ImageStyleTransformer}. The authors of \cite{ImageStyleTransformer} use 
+Style transfer is the problem of changing an image's artistic style while maintaining its ``content'', namely the object it depicts. Conventional models use CNN to extract features from an image, take in another image indicating the desired artistic style, and attempt to apply that style to the features of the original input image. However, it has been shown that due to the locality resulting from shared weights, CNN struggles to capture global information of input images and suffers from feature losses \cite{ImageStyleTransformer}. To resolve these issues, models that use Transformers instead of CNN for feature and style extraction have been proposed and shown improved results \cite{ImageStyleTransformer}. The model StyTr proposed in \cite{ImageStyleTransformer} takes in a content image and a style image, uses two transformer encoders to capture the content and style, then renders the content with that style using a thrid transformer decoder. In our project, we will substitute the DINO model proposed in \cite{DINO} for the encoder components and explore the effects on the task of style transfer. DINO method is good at extracting content even if the input images are distorted or partial. So in particular, we will implement the models and conduct experiments to explore the following questions:
+\begin{enumerate}
+  \item By using DINO to extract content, can we obtain a style transfer that is robust to distortions of content images?
+  \item Does DINO's ability to capture an image's global property from local pieces give it more robustness as a style encoder?
+\end{enumerate}
 
 
 \section{Related Works}
 
+\cite{DINO} came up with a new self-supervised learning method, named DINO (for Knowledge Distillation with No Labels) that aims to create better feature representations from its inputs by adopting a teacher-student approach. The student gets a difficult version (lots of augmentation) of the image while the teacher gets an easy version (minimal augmentation), and then the models are trained to aim for the same feature representation through cross entropy loss. Their experiment results found that the vision transformer's class token contained explicit information about the segmentation of objects in images, while also performing very well as classifiers. Our motivation for this project stems from how this DINO method has shown to have been able to achieve a better feature representation than supervised vision transformers, and we would like to apply this in a new domain: image style transfer.
+
+Self-supervised learning has been a common technique used in style transfer, due to the obvious lack of target images available for a task like this. It becomes necessary to find ways for the model to supervise its own outputs. Usual methods (add sources) involve checking the outputs of VGG for consistency in style and context. \cite{ImageStyleTransformer} proposes using vision transformers for this task, using two transformer encoders (one for content, one for style), and one transformer decoder. Transformers have been a hot rising topic in computer vision, and they claim that using transformers for style transfer result in a decrease in content leak, as well as achieving unbiased stylization.
+
+It becomes integral for there to be good feature representations of the content and style to construct a good style-transferred image. We believe that making use of pretrained DINO ViT models, as well as using the DINO method itself during training, can help achieve this.
 
 
 \section{Method}
@@ -70,6 +81,7 @@ We use a transformer trained by DINO as the initial weights for the content enco
 For the purpose of training we add a teacher content encoder and a teacher style encoder. Now, as in the DINO method, the content and style transformers are given distorted versions of the images (possibly only cropped and flipped to avoid abstracting the incorrect style characteristics), and the teachers are given the unmodified images. We then add to the loss from the standard style transfer to the cross entropy loss between the teacher encodings and and the student encodings. This forces the students to learn distillations of the original images. We expect this to work better for the style encoder, because style is a global property of an image, so we may only apply this method for the style encoder.
 
 \subsection{Modified DINO Training for Encoders}
+
 
 
 
