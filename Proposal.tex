@@ -32,11 +32,12 @@
   University of Toronoto \\
   Toronto, ON, M5S 1A1 \\
   \texttt{yuchongz.zhang@mail.utoronto.ca} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
+  \And
+  Shirley Wang \\
+  Department of Computer Science \\
+  University of Toronto \\
+  Toronto, ON M5S 1A1 \\
+  \texttt{shirlsyuemeng.wang@mail.utoronto.ca} \\
 }
 
 \begin{document}
@@ -66,19 +67,19 @@ It becomes integral for there to be good feature representations of the content 
 
 \section{Method}
 
-We have four different idea for bringing the success of the DINO method to the domain of style transfer.
+We have four different ideas for bringing the success of the DINO method to the style transfer task.
 
 \subsection{Frozen DINO Content Encoder}
 
-We replace the content encoder with a transformer trained by DINO and then train the style and decoders using the regular style transfer training paradigm. The idea being that the DINO models robust features vectors may act as powerful abstractions of the information that can be decoded with the new style.
+We initialize the content encoder with the DINO pretrained vision transformer and freeze its weights, while training the style encoder and decoder using the regular style transfer training paradigm. The idea being that the DINO models robust features vectors may act as powerful abstractions of the information that can be decoded with the new style.
 
 \subsection{DINO Weight Initialized Content Encoder}
 
-We use a transformer trained by DINO as the initial weights for the content encoder but we run the style transfer training paradigm on both encoders and the decoder, effectively using the weights from DINO as initial weights. We expect this to converge to a different optima because transformers have many local optima. We hope that the robust abstractions from the DINO training process lead to better style transfer.
+We initialize the content encoder with the DINO pretrained vision transformer, but we run the style transfer training paradigm on both encoders and the decoder. We expect this to converge to a different optima because transformers have many local optima. We hope that the robust abstractions from the DINO training process lead to better style transfer.
 
 \subsection{DINO Training for Encoders}
 
-For the purpose of training we add a teacher content encoder and a teacher style encoder. Now, as in the DINO method, the content and style transformers are given distorted versions of the images (possibly only cropped and flipped to avoid abstracting the incorrect style characteristics), and the teachers are given the unmodified images. We then add to the loss from the standard style transfer to the cross entropy loss between the teacher encodings and and the student encodings. This forces the students to learn distillations of the original images. We expect this to work better for the style encoder, because style is a global property of an image, so we may only apply this method for the style encoder.
+For the purpose of DINO training we add a teacher content encoder and a teacher style encoder. Now, as in the DINO method, the content and style transformers are given distorted versions of the images (possibly only cropped and flipped to avoid abstracting the incorrect style characteristics), and the teachers are given the unmodified images. We then add to the loss from the standard style transfer to the cross entropy loss between the teacher encodings and and the student encodings. This forces the students to learn distillations of the original images. We expect this to work better for the style encoder, because style is a global property of an image, so we may only apply this method for the style encoder.
 
 \subsection{Modified DINO Training for Encoders}
 
