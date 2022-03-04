@@ -2,3 +2,5 @@
 .texpadtmp
 Proposal.pdf
 Paper.pdf
+*.out
+*.log
