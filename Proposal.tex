@@ -57,7 +57,9 @@ Style transfer is the problem of changing an image's artistic style while mainta
 
 We have four different idea for brining the success of the DINO method to the domain of style transfer.
 
-\subsection{DINO Content Encoder} 
+\subsection{DINO Content Encoder}
+
+We replace the content encoder with a transformer trained by DINO and then train the style and decoders using the regular style transfer paradigm. The idea being that the DINO models robust features vectors may act as powerful abstractions of the information that can be decoded with the new style.
 
 \subsection{Pre-trained DINO Content Encoder}
 
