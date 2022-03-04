@@ -51,15 +51,11 @@ Style transfer is the problem of changing an image's artistic style while mainta
 
 \section{Related Works}
 
-\cite{dino} came up with a new self-supervised learning method, named DINO (for Knowledge Distillation with No Labels) that aims to create better feature representations from its inputs by adopting a teacher-student approach. The student gets a difficult version (lots of augmentation) of the image while the teacher gets an easy version (minimal augmentation), and then the models are trained to aim for the same feature representation through cross entropy loss. Their experiment results found that the vision transformer's class token contained explicit information about the segmentation of objects in images, while also performing very well as classifiers. Our motivation for this project stems from how this DINO method has shown to have been able to achieve a better feature representation than supervised vision transformers, and we would like to apply this in a new domain: image style transfer.
+\cite{DINO} came up with a new self-supervised learning method, named DINO (for Knowledge Distillation with No Labels) that aims to create better feature representations from its inputs by adopting a teacher-student approach. The student gets a difficult version (lots of augmentation) of the image while the teacher gets an easy version (minimal augmentation), and then the models are trained to aim for the same feature representation through cross entropy loss. Their experiment results found that the vision transformer's class token contained explicit information about the segmentation of objects in images, while also performing very well as classifiers. Our motivation for this project stems from how this DINO method has shown to have been able to achieve a better feature representation than supervised vision transformers, and we would like to apply this in a new domain: image style transfer.
 
-Self-supervised learning has been a common technique used in style transfer, due to the obvious lack of target images available for a task like this. It becomes necessary to find ways for the model to supervise its own outputs. Usual methods (add sources) involve checking the outputs of VGG for consistency in style and context. 
+Self-supervised learning has been a common technique used in style transfer, due to the obvious lack of target images available for a task like this. It becomes necessary to find ways for the model to supervise its own outputs. Usual methods (add sources) involve checking the outputs of VGG for consistency in style and context. \cite{ImageStyleTransformer} proposes using vision transformers for this task, using two transformer encoders (one for content, one for style), and one transformer decoder. Transformers have been a hot rising topic in computer vision, and they claim that using transformers for style transfer result in a decrease in content leak, as well as achieving unbiased stylization.
 
-
-
-(write something about the Style Transfer Transformer)
-
-(write something about different style transfer methods)
+It becomes integral for there to be good feature representations of the content and style to construct a good style-transferred image. We believe that making use of pretrained DINO ViT models, as well as using the DINO method itself during training, can help achieve this.
 
 
 \section{Method}
