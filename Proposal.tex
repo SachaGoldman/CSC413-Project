@@ -46,7 +46,7 @@
 \end{abstract}
 
 \section{Introduction}
-
+Style transfer is the problem of changing an image's artistic style while maintaining its ``content'', namely the object it depicts. Conventional models use CNN to extract features from an image, take in another image indicating the desired artistic style, and attempt to apply that style to the features of the original input image. However, it has been shown that due to the locality resulting from shared weights, CNN struggles to capture global information of input images and suffers from feature losses \cite{ImageStyleTransformer}. To resolve these issues, models that use Transformers instead of CNN for feature and style extraction have been proposed and shown improved results \cite{ImageStyleTransformer}. The authors of \cite{ImageStyleTransformer} use 
 
 
 \section{Related Works}
@@ -64,7 +64,17 @@ Self-supervised learning has been a common technique used in style transfer, due
 
 \section{Method}
 
+We have four different idea for brining the success of the DINO method to the domain of style transfer.
 
+\subsection{DINO Content Encoder}
+
+We replace the content encoder with a transformer trained by DINO and then train the style and decoders using the regular style transfer paradigm. The idea being that the DINO models robust features vectors may act as powerful abstractions of the information that can be decoded with the new style.
+
+\subsection{Pre-trained DINO Content Encoder}
+
+\subsection{DINO Training for Encoders}
+
+\subsection{Modified DINO Training for Encoders}
 
 
 
