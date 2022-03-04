@@ -25,11 +25,13 @@
   University of Toronto\\
   Toronto, ON M5S 1A1 \\
   \texttt{sacha.goldman@mail.utoronto.ca} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
+  \And
+  Yuchong Zhang \\
+  Department of Computer Science \\
+  Department of Mathematics \\
+  University of Toronoto \\
+  Toronto, ON, M5S 1A1 \\
+  \texttt{yuchongz.zhang@mail.utoronto.ca} \\
   % \And
   % Coauthor \\
   % Affiliation \\
@@ -46,7 +48,11 @@
 \end{abstract}
 
 \section{Introduction}
-Style transfer is the problem of changing an image's artistic style while maintaining its ``content'', namely the object it depicts. Conventional models use CNN to extract features from an image, take in another image indicating the desired artistic style, and attempt to apply that style to the features of the original input image. However, it has been shown that due to the locality resulting from shared weights, CNN struggles to capture global information of input images and suffers from feature losses \cite{ImageStyleTransformer}. To resolve these issues, models that use Transformers instead of CNN for feature and style extraction have been proposed and shown improved results \cite{ImageStyleTransformer}. The authors of \cite{ImageStyleTransformer} use 
+Style transfer is the problem of changing an image's artistic style while maintaining its ``content'', namely the object it depicts. Conventional models use CNN to extract features from an image, take in another image indicating the desired artistic style, and attempt to apply that style to the features of the original input image. However, it has been shown that due to the locality resulting from shared weights, CNN struggles to capture global information of input images and suffers from feature losses \cite{ImageStyleTransformer}. To resolve these issues, models that use Transformers instead of CNN for feature and style extraction have been proposed and shown improved results \cite{ImageStyleTransformer}. The model StyTr proposed in \cite{ImageStyleTransformer} takes in a content image and a style image, uses two transformer encoders to capture the content and style, then renders the content with that style using a thrid transformer decoder. In our project, we will substitute the DINO model proposed in \cite{DINO} for the encoder components and explore the effects on the task of style transfer. DINO method is good at extracting content even if the input images are distorted or partial. So in particular, we will implement the models and conduct experiments to explore the following questions:
+\begin{enumerate}
+  \item By using DINO to extract content, can we obtain a style transfer that is robust to distortions of content images?
+  \item Does DINO's ability to capture an image's global property from local pieces give it more robustness as a style encoder?
+\end{enumerate}
 
 
 \section{Related Works}
