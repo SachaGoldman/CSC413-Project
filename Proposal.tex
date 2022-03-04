@@ -60,15 +60,19 @@ It becomes integral for there to be good feature representations of the content 
 
 \section{Method}
 
-We have four different idea for brining the success of the DINO method to the domain of style transfer.
+We have four different idea for bringing the success of the DINO method to the domain of style transfer.
 
-\subsection{DINO Content Encoder}
+\subsection{Frozen DINO Content Encoder}
 
-We replace the content encoder with a transformer trained by DINO and then train the style and decoders using the regular style transfer paradigm. The idea being that the DINO models robust features vectors may act as powerful abstractions of the information that can be decoded with the new style.
+We replace the content encoder with a transformer trained by DINO and then train the style and decoders using the regular style transfer training paradigm. The idea being that the DINO models robust features vectors may act as powerful abstractions of the information that can be decoded with the new style.
 
-\subsection{Pre-trained DINO Content Encoder}
+\subsection{DINO Weight Initialized Content Encoder}
+
+We use a transformer trained by DINO as the initial weights for the content encoder but we run the style transfer training paradigm on both encoders and the decoder, effectively using the weights from DINO as initial weights. We expect this to converge to a different optima because transformers have many local optima. We hope that the robust abstractions from the DINO training process lead to better style transfer.
 
 \subsection{DINO Training for Encoders}
+
+
 
 \subsection{Modified DINO Training for Encoders}
 
