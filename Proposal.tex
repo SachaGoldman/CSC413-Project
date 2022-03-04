@@ -45,7 +45,7 @@
 \maketitle
 
 \begin{abstract}
-
+We combine DINO \cite{DINO}, a self-supervised learning method that captures feature representations of input images, with StyTr \cite{ImageStyleTransformer}, a style transferer that renders images with artistic style, and explore the robustness of the resulting model.
 \end{abstract}
 
 \section{Introduction}
@@ -83,8 +83,7 @@ For the purpose of DINO training we add a teacher content encoder and a teacher 
 
 \subsection{Modified DINO Training for Encoders}
 
-
-
+This method is similar to the previous expect instead of taking the cross entropy between the encodings we take apply the decoder transformer to the encodings from the teacher encoders, to yield a new image. We then add to our loss the distance between the teacher image and the student image. The precise distance metric used here is to be determined through experimentation. This will allow the encoders to distill the important pieces of the stylized image. This method may suffer from being very expensive to train, which may cause issues. We also may only apply this to the style encoder.
 
 \medskip
 
