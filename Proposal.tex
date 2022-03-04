@@ -78,7 +78,7 @@ We use a transformer trained by DINO as the initial weights for the content enco
 
 \subsection{DINO Training for Encoders}
 
-
+For the purpose of training we add a teacher content encoder and a teacher style encoder. Now, as in the DINO method, the content and style transformers are given distorted versions of the images (possibly only cropped and flipped to avoid abstracting the incorrect style characteristics), and the teachers are given the unmodified images. We then add to the loss from the standard style transfer to the cross entropy loss between the teacher encodings and and the student encodings. This forces the students to learn distillations of the original images. We expect this to work better for the style encoder, because style is a global property of an image, so we may only apply this method for the style encoder.
 
 \subsection{Modified DINO Training for Encoders}
 
