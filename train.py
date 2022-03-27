@@ -1,3 +1,9 @@
+"""
+TODO: add DINO training as a possible thing through a flag
+
+TODO: add loss function here, take it out of the model
+"""
+
 import argparse
 import os
 import torch

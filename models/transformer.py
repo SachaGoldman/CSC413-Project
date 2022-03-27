@@ -22,6 +22,7 @@ class Transformer(nn.Module):
         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
         
         # TODO: these encoders are the things we talked about in our proposal
+        # replaye with DINO through a flag
         self.encoder_c = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
         self.encoder_s = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
 

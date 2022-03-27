@@ -1,3 +1,7 @@
+"""
+NOTE: The original utils.py file from the dino repo, some util functions for training
+"""
+
 # Copyright (c) Facebook, Inc. and its affiliates.
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");

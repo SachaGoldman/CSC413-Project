@@ -1,3 +1,8 @@
+"""
+TODO: use this as a basis in the train file to add DINO training to the style transfer stuff
+"""
+
+
 # Copyright (c) Facebook, Inc. and its affiliates.
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
