@@ -11,48 +11,14 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.utils.data as data
-from torchvision import transforms
 from torchvision.utils import save_image
-from PIL import Image
-from PIL import ImageFile
 from tensorboardX import SummaryWriter
 
 import models.transformer as transformer
-import models.StyTR  as StyTR 
+import models.StyTR  as StyTR
+from ImageDataset import ImageDataset
+from ImageDataset import train_transform
 from sampler import InfiniteSamplerWrapper
-
-def train_transform():
-    transform_list = [
-        transforms.Resize(size=(512, 512)),
-        transforms.RandomCrop(256),
-        transforms.ToTensor()
-    ]
-    return transforms.Compose(transform_list)
-
-
-class FlatFolderDataset(data.Dataset):
-    def __init__(self, root, transform):
-        super(FlatFolderDataset, self).__init__()
-        self.root = root
-        print(self.root)
-        self.path = os.listdir(self.root)
-        if os.path.isdir(os.path.join(self.root,self.path[0])):
-            self.paths = []
-            for file_name in os.listdir(self.root):
-                for file_name1 in os.listdir(os.path.join(self.root,file_name)):
-                    self.paths.append(self.root+"/"+file_name+"/"+file_name1)             
-        else:
-            self.paths = list(Path(self.root).glob('*'))
-        self.transform = transform
-    def __getitem__(self, index):
-        path = self.paths[index]
-        img = Image.open(str(path)).convert('RGB')
-        img = self.transform(img)
-        return img
-    def __len__(self):
-        return len(self.paths)
-    def name(self):
-        return 'FlatFolderDataset'
 
 def adjust_learning_rate(optimizer, iteration_count):
     """Imitating the original implementation"""
@@ -130,12 +96,12 @@ if __name__ == '__main__':
 
     network.to(device)
     #network = nn.DataParallel(network, device_ids=[0,1])  # Don't use DataParallel
-    content_tf = train_transform()
-    style_tf = train_transform()
 
     ### Create Dataset and DataLoader ###
-    content_dataset = FlatFolderDataset(args.content_dir, content_tf)
-    style_dataset = FlatFolderDataset(args.style_dir, style_tf)
+    content_tf = train_transform()
+    style_tf = train_transform()
+    content_dataset = ImageDataset(args.content_dir, content_tf)
+    style_dataset = ImageDataset(args.style_dir, style_tf)
 
     content_iter = iter(data.DataLoader(
         content_dataset, batch_size=args.batch_size,
@@ -148,9 +114,9 @@ if __name__ == '__main__':
     
     ### Create Optimizer (Jimmy Baaaaaaa) ###
     optimizer = torch.optim.Adam([ 
-                                {'params': network.module.transformer.parameters()},
-                                {'params': network.module.decode.parameters()},
-                                {'params': network.module.embedding.parameters()},        
+                                {'params': network.transformer.parameters()},
+                                {'params': network.decode.parameters()},
+                                {'params': network.embedding.parameters()},        
                                 ], lr=args.lr)
 
     ### Training Loop ###
@@ -160,8 +126,6 @@ if __name__ == '__main__':
             warmup_learning_rate(optimizer, iteration_count=i)
         else:
             adjust_learning_rate(optimizer, iteration_count=i)
-
-        # print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
 
         # get images from dataloaders
         content_images = next(content_iter).to(device)
@@ -178,12 +142,13 @@ if __name__ == '__main__':
         loss.sum().backward()
         optimizer.step()
     
-        print("Iteration:", i, "Loss:", loss.sum().cpu().detach().numpy(), "-content:", loss_c.sum().cpu().detach().numpy(), 
+        print("Loss:", loss.sum().cpu().detach().numpy(), "-content:", loss_c.sum().cpu().detach().numpy(), 
               "-style:", loss_s.sum().cpu().detach().numpy(), "-l1:", l_identity1.sum().cpu().detach().numpy(), "-l2:", l_identity2.sum().cpu().detach().numpy()
              )
 
         # save logging images to test folder every 100 iterations
         if i % 100 == 0:
+            print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
             output_name = '{:s}/test/{:s}{:s}'.format(
                             args.save_dir, str(i),".jpg"
                         )
@@ -200,16 +165,13 @@ if __name__ == '__main__':
 
         if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
             # save transformer model
-            state_dict = network.transformer.state_dict()
-            torch.save(state_dict, '{:s}/transformer_iter_{:d}.pth'.format(args.save_dir, i + 1))
+            torch.save(network.transformer.state_dict(), '{:s}/transformer_iter_{:d}.pth'.format(args.save_dir, i + 1))
 
             # save CNN Decoder
-            state_dict = network.decode.state_dict()
-            torch.save(state_dict, '{:s}/decoder_iter_{:d}.pth'.format(args.save_dir, i + 1))
+            torch.save(network.decode.state_dict(), '{:s}/decoder_iter_{:d}.pth'.format(args.save_dir, i + 1))
 
             # Save network embeddings
-            state_dict = network.embedding.state_dict()
-            torch.save(state_dict, '{:s}/embedding_iter_{:d}.pth'.format(args.save_dir, i + 1))
+            torch.save(network.embedding.state_dict(), '{:s}/embedding_iter_{:d}.pth'.format(args.save_dir, i + 1))
                    
     writer.close()
 

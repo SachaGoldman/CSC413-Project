@@ -1,0 +1,33 @@
+import os
+from glob import glob
+from PIL import Image
+import torch.utils.data as data
+from torchvision import transforms
+
+def train_transform():
+    transform_list = [
+        transforms.Resize(size=(512, 512)),
+        transforms.RandomCrop(256),
+        transforms.ToTensor()
+    ]
+    return transforms.Compose(transform_list)
+
+class ImageDataset(data.Dataset):
+    def __init__(self, root, transform):
+        super(ImageDataset, self).__init__()
+        self.root = root
+        print("Creating Dataset from", self.root)
+        self.paths = glob(os.path.join(self.root, "**/*.*"), recursive=True)
+        self.transform = transform
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+        img = Image.open(str(path)).convert('RGB')
+        img = self.transform(img)
+        return img
+
+    def __len__(self):
+        return len(self.paths)
+        
+    def name(self):
+        return 'ImageDataset'

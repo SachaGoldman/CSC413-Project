@@ -8,6 +8,8 @@
 **.blg
 **.aux
 **.gz
+**.zip
+**.nfs**
 
 weights
-dataset
+datasets
