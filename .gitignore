@@ -1,6 +1,13 @@
 **/*.DS_store
 .texpadtmp
-Proposal.pdf
-Paper.pdf
-*.out
-*.log
+**/Proposal.pdf
+**/Paper.pdf
+**.out
+**.log
+**.bbl
+**.blg
+**.aux
+**.gz
+
+weights
+dataset
