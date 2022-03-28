@@ -1,4 +1,5 @@
 **/*.DS_store
+**/__pycache__
 .texpadtmp
 **/Proposal.pdf
 **/Paper.pdf
@@ -13,3 +14,5 @@
 
 weights
 datasets
+experiments
+logs

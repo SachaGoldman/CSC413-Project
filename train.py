@@ -1,7 +1,5 @@
 """
 TODO: add DINO training as a possible thing through a flag
-
-TODO: add loss function here, take it out of the model
 """
 
 import argparse
@@ -10,11 +8,12 @@ from tqdm import tqdm
 from pathlib import Path
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.data as data
 from torchvision.utils import save_image
 from tensorboardX import SummaryWriter
 
-import models.transformer as transformer
+from function import calc_mean_std, normal, normal_style
 import models.StyTR  as StyTR
 from ImageDataset import ImageDataset
 from ImageDataset import train_transform
@@ -32,6 +31,55 @@ def warmup_learning_rate(optimizer, iteration_count):
     # print(lr)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+
+def calc_style_loss(input, target):
+    assert (input.size() == target.size())
+    assert (target.requires_grad is False)
+    input_mean, input_std = calc_mean_std(input)
+    target_mean, target_std = calc_mean_std(target)
+    return F.mse_loss(input_mean, target_mean) + F.mse_loss(input_std, target_std)
+
+def calc_content_loss(input, target):
+    assert (input.size() == target.size())
+    assert (target.requires_grad is False)
+    return F.mse_loss(input, target)
+
+def get_loss(model, vgg, content_input, style_input):
+    """
+    Calculate the loss function
+        - Ics: Image output created from content and style
+        - loss_c: Content perceptual loss
+        - loss_s: Style perceptual loss
+        - loss_lambda1: Identity loss between Icc and Ic, Iss and Is
+        - loss_lambda2: Identity loss between VGG features of Icc and Ic, Iss and Is
+    """
+    Ics = model(content_input, style_input)
+    Icc = model(content_input, content_input)
+    Iss = model(style_input, style_input)
+    with torch.no_grad():
+        content_feats = vgg(content_input)
+        style_feats = vgg(style_input)
+        Ics_feats = vgg(Ics)
+        Icc_feats = vgg(Icc)
+        Iss_feats = vgg(Iss)
+
+    # Content Perceptual Loss
+    loss_c = calc_content_loss(normal(Ics_feats[-1]), normal(content_feats[-1])) + calc_content_loss(normal(Ics_feats[-2]), normal(content_feats[-2]))
+    
+    # Style Perceptual Loss
+    loss_s = calc_style_loss(Ics_feats[0], style_feats[0])
+    for i in range(1, 5):
+        loss_s += calc_style_loss(Ics_feats[i], style_feats[i])
+
+    # Identity Loss 1
+    loss_lambda1 = calc_content_loss(Icc, content_input) + calc_content_loss(Iss, style_input)
+    
+    # Identity Loss 2
+    loss_lambda2 = calc_content_loss(Icc_feats[0], content_feats[0]) + calc_content_loss(Iss_feats[0], style_feats[0])
+    for i in range(1, 5):
+        loss_lambda2 += calc_content_loss(Icc_feats[i], content_feats[i]) + calc_content_loss(Iss_feats[i], style_feats[i])
+
+    return Ics.detach(), loss_c, loss_s, loss_lambda1, loss_lambda2
 
 
 if __name__ == '__main__':
@@ -82,18 +130,12 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=args.log_dir)
 
     ### Create the model ###
-    vgg = StyTR.vgg
-    vgg.load_state_dict(torch.load(args.vgg))
-    vgg = nn.Sequential(*list(vgg.children())[:44])
+    vgg = StyTR.VGGFeats(args.vgg)
+    vgg.eval()
+    vgg.to(device)
 
-    decoder = StyTR.decoder
-    embedding = StyTR.PatchEmbed()
-
-    Trans = transformer.Transformer()
-    with torch.no_grad():
-        network = StyTR.StyTrans(vgg, decoder, embedding, Trans, args)
+    network = StyTR.StyTrans(args)
     network.train()
-
     network.to(device)
     #network = nn.DataParallel(network, device_ids=[0,1])  # Don't use DataParallel
 
@@ -126,19 +168,19 @@ if __name__ == '__main__':
             warmup_learning_rate(optimizer, iteration_count=i)
         else:
             adjust_learning_rate(optimizer, iteration_count=i)
+        optimizer.zero_grad()
 
         # get images from dataloaders
         content_images = next(content_iter).to(device)
         style_images = next(style_iter).to(device) 
 
         # pass through model and get loss
-        out, loss_c, loss_s,l_identity1, l_identity2 = network(content_images, style_images)
+        out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(network, vgg, content_images, style_images) 
             
         loss_c = args.content_weight * loss_c
         loss_s = args.style_weight * loss_s
         loss = loss_c + loss_s + (l_identity1 * 70) + (l_identity2 * 1)
 
-        optimizer.zero_grad()
         loss.sum().backward()
         optimizer.step()
     
@@ -152,8 +194,8 @@ if __name__ == '__main__':
             output_name = '{:s}/test/{:s}{:s}'.format(
                             args.save_dir, str(i),".jpg"
                         )
-            out = torch.cat((content_images,out),0)
-            out = torch.cat((style_images,out),0)
+            out = torch.cat((content_images, out), 0)
+            out = torch.cat((style_images, out), 0)
             save_image(out, output_name)
 
         # write logging stats to Tensorboard
@@ -163,15 +205,14 @@ if __name__ == '__main__':
         writer.add_scalar('loss_identity2', l_identity2.sum().item(), i + 1)
         writer.add_scalar('total_loss', loss.sum().item(), i + 1)
 
+        # cleanup
+        del out, loss, loss_c, loss_s, l_identity1, l_identity2
+
         if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
-            # save transformer model
             torch.save(network.transformer.state_dict(), '{:s}/transformer_iter_{:d}.pth'.format(args.save_dir, i + 1))
-
-            # save CNN Decoder
             torch.save(network.decode.state_dict(), '{:s}/decoder_iter_{:d}.pth'.format(args.save_dir, i + 1))
-
-            # Save network embeddings
             torch.save(network.embedding.state_dict(), '{:s}/embedding_iter_{:d}.pth'.format(args.save_dir, i + 1))
+            print("Saved Checkpoints")
                    
     writer.close()
 
