@@ -11,8 +11,9 @@
 **.gz
 **.zip
 **.nfs**
+.ipynb_checkpoints/
 
 weights
 datasets
-experiments
-logs
+experiment*
+logs*

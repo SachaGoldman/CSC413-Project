@@ -112,6 +112,8 @@ if __name__ == '__main__':
     # add additional flags for other experiments
     parser.add_argument('--dino_encoder', default="none", type=str, help="Use a pretrained DINO encoder", choices=("none", "vits16", "vits8", "vitb16", "vitb8"))
     parser.add_argument('--freeze_encoder', action='store_true')
+
+    parser.add_argument('--amp', action='store_true', help="Use Automatic Mixed Precision (to help with batch sizes)")
     args = parser.parse_args()
 
     USE_CUDA = torch.cuda.is_available()
@@ -167,6 +169,10 @@ if __name__ == '__main__':
                                 {'params': network.embedding.parameters()},        
                                 ], lr=args.lr)
 
+    if args.amp:
+        print("Using Automatic Mixed Precision")
+        scaler = torch.cuda.amp.GradScaler()
+
     ### Training Loop ###
     for i in tqdm(range(args.max_iter)):
         # learning rate strategy
@@ -181,28 +187,27 @@ if __name__ == '__main__':
         style_images = next(style_iter).to(device) 
 
         # pass through model and get loss
-        out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(network, vgg, content_images, style_images) 
+        if args.amp:
+            with torch.cuda.amp.autocast():
+                out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(network, vgg, content_images, style_images) 
+        else:
+            out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(network, vgg, content_images, style_images) 
             
         loss_c = args.content_weight * loss_c
         loss_s = args.style_weight * loss_s
         loss = loss_c + loss_s + (l_identity1 * 70) + (l_identity2 * 1)
 
-        loss.sum().backward()
-        optimizer.step()
+        if args.amp:
+            scaler.scale(loss.sum()).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.sum().backward()
+            optimizer.step()
     
         print("Loss:", loss.sum().cpu().detach().numpy(), "-content:", loss_c.sum().cpu().detach().numpy(), 
               "-style:", loss_s.sum().cpu().detach().numpy(), "-l1:", l_identity1.sum().cpu().detach().numpy(), "-l2:", l_identity2.sum().cpu().detach().numpy()
              )
-
-        # save logging images to test folder every 1000 iterations
-        if i % 1000 == 0:
-            print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
-            output_name = '{:s}/test/{:s}{:s}'.format(
-                            args.save_dir, str(i),".jpg"
-                        )
-            out = torch.cat((content_images, out), 0)
-            out = torch.cat((style_images, out), 0)
-            save_image(out, output_name)
 
         # write logging stats to Tensorboard
         writer.add_scalar('loss_content', loss_c.sum().item(), i + 1)
@@ -211,14 +216,23 @@ if __name__ == '__main__':
         writer.add_scalar('loss_identity2', l_identity2.sum().item(), i + 1)
         writer.add_scalar('total_loss', loss.sum().item(), i + 1)
 
-        # cleanup
-        del out, loss, loss_c, loss_s, l_identity1, l_identity2
-
+        # checkpoint and save logging images
         if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
+            print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
+            output_name = '{:s}/test/{:s}{:s}'.format(
+                            args.save_dir, str(i),".jpg"
+                        )
+            out = torch.cat((content_images, out), 0)
+            out = torch.cat((style_images, out), 0)
+            save_image(out, output_name)
+
             torch.save(network.transformer.state_dict(), '{:s}/transformer_iter_{:d}.pth'.format(args.save_dir, i + 1))
             torch.save(network.decode.state_dict(), '{:s}/decoder_iter_{:d}.pth'.format(args.save_dir, i + 1))
             torch.save(network.embedding.state_dict(), '{:s}/embedding_iter_{:d}.pth'.format(args.save_dir, i + 1))
             print("Saved Checkpoints")
+
+        # cleanup
+        del out, loss, loss_c, loss_s, l_identity1, l_identity2
                    
     writer.close()
 
