@@ -112,10 +112,8 @@ class PatchEmbed(nn.Module):
         num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
         self.img_size = img_size
         self.patch_size = patch_size
-        self.num_patches = num_patches
-        
+        self.num_patches = num_patches        
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.up1 = nn.Upsample(scale_factor=2, mode='nearest')
 
     def forward(self, x):
         B, C, H, W = x.shape
@@ -178,9 +176,39 @@ class StyTrans(nn.Module):
         Initialize the main model.
         """
         super().__init__()
-        self.transformer = transformer.Transformer()    
-        self.decode = cnn_decoder
         self.embedding = PatchEmbed()
+        self.transformer = transformer.Transformer(dino_encoder=args.dino_encoder)    
+        self.decode = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(self.transformer.d_model, 256, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 128, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 128, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 64, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 64, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 3, (3, 3)),
+        )
 
     def forward(self, samples_c: NestedTensor, samples_s: NestedTensor):
         """
@@ -194,11 +222,16 @@ class StyTrans(nn.Module):
             samples_s = nested_tensor_from_tensor_list(samples_s) 
         
         ### Linear projection
-        style = self.embedding(samples_s.tensors)
-        content = self.embedding(samples_c.tensors)
+        # NOTE: no PatchEmbedding needed if using DINO ViT since those have that built in
+        if self.transformer.dino_encoder == "none":
+            style = self.embedding(samples_s.tensors)
+            content = self.embedding(samples_c.tensors)
+        else:
+            style = samples_s.tensors
+            content = samples_c.tensors
         pos_s = None
         pos_c = None
         mask = None
-        
+
         Ics = self.decode(self.transformer(style, mask, content, pos_c, pos_s))
         return Ics 

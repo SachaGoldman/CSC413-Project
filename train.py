@@ -155,8 +155,14 @@ if __name__ == '__main__':
         num_workers=args.n_threads))
     
     ### Create Optimizer (Jimmy Baaaaaaa) ###
+    if args.freeze_encoder:
+        for param in network.transformer.encoder_c.parameters():
+            param.requires_grad = False
+        for param in network.transformer.encoder_s.parameters():
+            param.requires_grad = False
+
     optimizer = torch.optim.Adam([ 
-                                {'params': network.transformer.parameters()},
+                                {'params': filter(lambda p: p.requires_grad, network.transformer.parameters())},
                                 {'params': network.decode.parameters()},
                                 {'params': network.embedding.parameters()},        
                                 ], lr=args.lr)
@@ -188,8 +194,8 @@ if __name__ == '__main__':
               "-style:", loss_s.sum().cpu().detach().numpy(), "-l1:", l_identity1.sum().cpu().detach().numpy(), "-l2:", l_identity2.sum().cpu().detach().numpy()
              )
 
-        # save logging images to test folder every 100 iterations
-        if i % 100 == 0:
+        # save logging images to test folder every 1000 iterations
+        if i % 1000 == 0:
             print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
             output_name = '{:s}/test/{:s}{:s}'.format(
                             args.save_dir, str(i),".jpg"

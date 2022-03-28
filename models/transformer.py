@@ -7,24 +7,49 @@ from torch import nn, Tensor
 from function import normal,normal_style
 import numpy as np
 import os
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-os.environ["CUDA_VISIBLE_DEVICES"] = "2, 3"
+
+
+class DINOTransformer(nn.Module):
+    """
+    Because I need to override the DINO forward function
+    """
+    def __init__(self, pretrained):
+        super().__init__()
+        self.dino = torch.hub.load('facebookresearch/dino:main', 'dino_' + pretrained)
+        self.embed_dim = self.dino.embed_dim
+
+    def forward(self, x):
+        x = self.dino.prepare_tokens(x)
+        for blk in self.dino.blocks:
+            x = blk(x)
+        x = self.dino.norm(x)
+        return x[:, 1:]
+
+
 class Transformer(nn.Module):
 
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=3,
                  num_decoder_layers=3, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
-                 return_intermediate_dec=False):
+                 return_intermediate_dec=False, dino_encoder="none"):
         super().__init__()
 
-        encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
-                                                dropout, activation, normalize_before)
-        encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
+        self.dino_encoder = dino_encoder
+        if dino_encoder == "none":
+            print("Creating Traditional Transformer Encoder")
+            encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
+                                                    dropout, activation, normalize_before)
+            encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
+            self.encoder_c = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+            self.encoder_s = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+        else:
+            print("Using DINO Pretrained ViT As Encoder")
+            self.encoder_c = DINOTransformer(dino_encoder)
+            self.encoder_s = DINOTransformer(dino_encoder)
         
-        # TODO: these encoders are the things we talked about in our proposal
-        # replaye with DINO through a flag
-        self.encoder_c = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
-        self.encoder_s = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
+            # need to override the decoder dimension in this case
+            d_model = int(self.encoder_c.embed_dim)
+            dim_feedforward = d_model * 4
 
         decoder_layer = TransformerDecoderLayer(d_model, nhead, dim_feedforward,
                                                 dropout, activation, normalize_before)
@@ -37,33 +62,43 @@ class Transformer(nn.Module):
         self.d_model = d_model
         self.nhead = nhead
 
-        self.new_ps = nn.Conv2d(512 , 512 , (1,1))
+        self.new_ps = nn.Conv2d(512, 512, (1,1))
         self.averagepooling = nn.AdaptiveAvgPool2d(18)
 
     def _reset_parameters(self):
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+        if self.dino_encoder == "none":
+            for p in self.parameters():
+                if p.dim() > 1:
+                    nn.init.xavier_uniform_(p)
+        else:
+            for p in self.decoder.parameters():
+                if p.dim() > 1:
+                    nn.init.xavier_uniform_(p)
 
-    def forward(self, style, mask , content, pos_embed_c, pos_embed_s):
+    def forward(self, style, mask, content, pos_embed_c, pos_embed_s):
+        if self.dino_encoder == "none":
+            # content-aware positional embedding
+            content_pool = self.averagepooling(content)       
+            pos_c = self.new_ps(content_pool)
+            pos_embed_c = F.interpolate(pos_c, mode='bilinear',size= style.shape[-2:])
 
-        # content-aware positional embedding
-        content_pool = self.averagepooling(content)       
-        pos_c = self.new_ps(content_pool)
-        pos_embed_c = F.interpolate(pos_c, mode='bilinear',size= style.shape[-2:])
-
-        ###flatten NxCxHxW to HWxNxC     
-        style = style.flatten(2).permute(2, 0, 1)
-        if pos_embed_s is not None:
-            pos_embed_s = pos_embed_s.flatten(2).permute(2, 0, 1)
-      
-        content = content.flatten(2).permute(2, 0, 1)
-        if pos_embed_c is not None:
-            pos_embed_c = pos_embed_c.flatten(2).permute(2, 0, 1)
-     
+            ### flatten NxCxHxW to HWxNxC
+            style = style.flatten(2).permute(2, 0, 1)
+            if pos_embed_s is not None:
+                pos_embed_s = pos_embed_s.flatten(2).permute(2, 0, 1)
         
-        style = self.encoder_s(style, src_key_padding_mask=mask, pos=pos_embed_s)
-        content = self.encoder_c(content, src_key_padding_mask=mask, pos=pos_embed_c)
+            content = content.flatten(2).permute(2, 0, 1)
+            if pos_embed_c is not None:
+                pos_embed_c = pos_embed_c.flatten(2).permute(2, 0, 1)
+
+            style = self.encoder_s(style, src_key_padding_mask=mask, pos=pos_embed_s)
+            content = self.encoder_c(content, src_key_padding_mask=mask, pos=pos_embed_c)
+        else:
+            style = self.encoder_s(style)
+            content = self.encoder_c(content)
+            style = style.permute(1, 0, 2)
+            content = content.permute(1, 0, 2)
+
         hs = self.decoder(content, style, memory_key_padding_mask=mask,
                           pos=pos_embed_s, query_pos=pos_embed_c)[0]
         
