@@ -22,7 +22,16 @@ class ImageDataset(data.Dataset):
 
     def __getitem__(self, index):
         path = self.paths[index]
-        img = Image.open(str(path)).convert('RGB')
+        img = None
+        while img is None:
+            # while loop to get around bad image read problems
+            try:
+                img = Image.open(str(path)).convert('RGB')
+            except:
+                # get a different one
+                index = index + 10
+                path = self.paths[(index) % len(self.paths)]
+
         img = self.transform(img)
         return img
 

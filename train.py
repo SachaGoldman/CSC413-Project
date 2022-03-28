@@ -28,7 +28,6 @@ def adjust_learning_rate(optimizer, iteration_count):
 def warmup_learning_rate(optimizer, iteration_count):
     """Imitating the original implementation"""
     lr = args.lr * 0.1 * (1.0 + 3e-4 * iteration_count)
-    # print(lr)
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -113,7 +112,10 @@ if __name__ == '__main__':
     parser.add_argument('--dino_encoder', default="none", type=str, help="Use a pretrained DINO encoder", choices=("none", "vits16", "vits8", "vitb16", "vitb8"))
     parser.add_argument('--freeze_encoder', action='store_true')
 
+    # additional flags for training implemented
     parser.add_argument('--amp', action='store_true', help="Use Automatic Mixed Precision (to help with batch sizes)")
+    parser.add_argument('--save_img_interval', type=int, default=1000)
+    parser.add_argument('--gradient_accum_steps', type=int, default=1, help="Number of steps to accumulate gradients over")
     args = parser.parse_args()
 
     USE_CUDA = torch.cuda.is_available()
@@ -180,7 +182,6 @@ if __name__ == '__main__':
             warmup_learning_rate(optimizer, iteration_count=i)
         else:
             adjust_learning_rate(optimizer, iteration_count=i)
-        optimizer.zero_grad()
 
         # get images from dataloaders
         content_images = next(content_iter).to(device)
@@ -195,17 +196,22 @@ if __name__ == '__main__':
             
         loss_c = args.content_weight * loss_c
         loss_s = args.style_weight * loss_s
-        loss = loss_c + loss_s + (l_identity1 * 70) + (l_identity2 * 1)
+        loss = (loss_c + loss_s + (l_identity1 * 70) + (l_identity2 * 1)).sum() / args.gradient_accum_steps
 
         if args.amp:
-            scaler.scale(loss.sum()).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            scaler.scale(loss).backward()
+            if i % args.gradient_accum_steps == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+
         else:
-            loss.sum().backward()
-            optimizer.step()
+            loss.backward()
+            if i % args.gradient_accum_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
     
-        print("Loss:", loss.sum().cpu().detach().numpy(), "-content:", loss_c.sum().cpu().detach().numpy(), 
+        print("Loss:", loss.cpu().detach().numpy() * args.gradient_accum_steps, "-content:", loss_c.sum().cpu().detach().numpy(), 
               "-style:", loss_s.sum().cpu().detach().numpy(), "-l1:", l_identity1.sum().cpu().detach().numpy(), "-l2:", l_identity2.sum().cpu().detach().numpy()
              )
 
@@ -214,25 +220,26 @@ if __name__ == '__main__':
         writer.add_scalar('loss_style', loss_s.sum().item(), i + 1)
         writer.add_scalar('loss_identity1', l_identity1.sum().item(), i + 1)
         writer.add_scalar('loss_identity2', l_identity2.sum().item(), i + 1)
-        writer.add_scalar('total_loss', loss.sum().item(), i + 1)
+        writer.add_scalar('total_loss', loss.item() * args.gradient_accum_steps, i + 1)
 
         # checkpoint and save logging images
-        if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
-            print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
+        if i == 0 or (i + 1) % args.save_img_interval == 0 or (i + 1) == args.max_iter:
             output_name = '{:s}/test/{:s}{:s}'.format(
-                            args.save_dir, str(i),".jpg"
+                            args.save_dir, str(i+1),".jpg"
                         )
             out = torch.cat((content_images, out), 0)
             out = torch.cat((style_images, out), 0)
-            save_image(out, output_name)
+            save_image(out, output_name, nrow=args.batch_size)
 
+        # cleanup
+        del out, loss, loss_c, loss_s, l_identity1, l_identity2
+
+        if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
+            print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
             torch.save(network.transformer.state_dict(), '{:s}/transformer_iter_{:d}.pth'.format(args.save_dir, i + 1))
             torch.save(network.decode.state_dict(), '{:s}/decoder_iter_{:d}.pth'.format(args.save_dir, i + 1))
             torch.save(network.embedding.state_dict(), '{:s}/embedding_iter_{:d}.pth'.format(args.save_dir, i + 1))
             print("Saved Checkpoints")
-
-        # cleanup
-        del out, loss, loss_c, loss_s, l_identity1, l_identity2
                    
     writer.close()
 
