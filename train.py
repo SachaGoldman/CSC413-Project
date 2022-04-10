@@ -110,12 +110,14 @@ if __name__ == '__main__':
 
     # add additional flags for other experiments
     parser.add_argument('--dino_encoder', default="none", type=str, help="Use a pretrained DINO encoder", choices=("none", "vits16", "vits8", "vitb16", "vitb8"))
-    parser.add_argument('--freeze_encoder', action='store_true')
+    parser.add_argument('--freeze_encoder_c', action='store_true')
+    parser.add_argument('--freeze_encoder_s', action='store_true')
 
     # additional flags for training implemented
     parser.add_argument('--amp', action='store_true', help="Use Automatic Mixed Precision (to help with batch sizes)")
     parser.add_argument('--save_img_interval', type=int, default=1000)
     parser.add_argument('--gradient_accum_steps', type=int, default=1, help="Number of steps to accumulate gradients over")
+    parser.add_argument("--max_norm", type=float, default=10.0, help="Clipping gradient norm")
     args = parser.parse_args()
 
     USE_CUDA = torch.cuda.is_available()
@@ -159,9 +161,10 @@ if __name__ == '__main__':
         num_workers=args.n_threads))
     
     ### Create Optimizer (Jimmy Baaaaaaa) ###
-    if args.freeze_encoder:
+    if args.freeze_encoder_c:
         for param in network.transformer.encoder_c.parameters():
             param.requires_grad = False
+    if args.freeze_encoder_s:
         for param in network.transformer.encoder_s.parameters():
             param.requires_grad = False
 
@@ -201,12 +204,17 @@ if __name__ == '__main__':
         if args.amp:
             scaler.scale(loss).backward()
             if i % args.gradient_accum_steps == 0:
+                # gradient clipping
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(network.parameters(), args.max_norm)
+
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
 
         else:
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(network.parameters(), args.max_norm)
             if i % args.gradient_accum_steps == 0:
                 optimizer.step()
                 optimizer.zero_grad()
