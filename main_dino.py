@@ -35,7 +35,7 @@ import torch.nn.functional as F
 from torchvision import datasets, transforms
 from torchvision import models as torchvision_models
 
-import util.dino_utils as util
+import util.dino_utils as utils
 import vision_transformer as vits
 from vision_transformer import DINOHead
 
