@@ -11,10 +11,10 @@
 **.gz
 **.zip
 **.nfs**
+venv
 .ipynb_checkpoints/
 
 weights
 datasets
 experiment*
 logs*
-venv

@@ -1,14 +1,18 @@
+import numpy as np
 import torch
 import torch.nn.functional as F
+from function import calc_mean_std, normal, normal_style
 from torch import nn
-import numpy as np
-
 from util import box_ops
-from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
-                       accuracy, get_world_size, interpolate,
-                       is_dist_avail_and_initialized)
-from function import normal,normal_style
-from function import calc_mean_std
+from util.misc import (
+    NestedTensor,
+    accuracy,
+    get_world_size,
+    interpolate,
+    is_dist_avail_and_initialized,
+    nested_tensor_from_tensor_list,
+)
+
 import models.transformer as transformer
 from models.ViT_helper import DropPath, to_2tuple, trunc_normal_
 
