@@ -127,9 +127,9 @@ if __name__ == '__main__':
                         help="Use a pretrained DINO encoder", choices=("none", "vits16", "vits8", "vitb16", "vitb8"))
     parser.add_argument('--freeze_encoder_c', action='store_true')
     parser.add_argument('--freeze_encoder_s', action='store_true')
-    parser.add_argument('--dino_s_encoder_training',
+    parser.add_argument('--dino_s_encoder_training', type=utils.bool_flag, default=False,
                         help="Use the dino training procedure for the style encoder")
-    parser.add_argument('--dino_c_encoder_training',
+    parser.add_argument('--dino_c_encoder_training', type=utils.bool_flag, default=False,
                         help="Use the dino training procedure for the content encoder")
     parser.add_argument('--dino_encoder_loss', default="none", type=str,
                         help="If using the dino training procedure, decide which loss to use", choices=("none", "embedded"))
