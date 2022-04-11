@@ -17,3 +17,4 @@ weights
 datasets
 experiment*
 logs*
+venv
