@@ -1,8 +1,10 @@
 import os
 from glob import glob
-from PIL import Image
+
 import torch.utils.data as data
+from PIL import Image
 from torchvision import transforms
+
 
 def train_transform():
     transform_list = [
@@ -11,6 +13,7 @@ def train_transform():
         transforms.ToTensor()
     ]
     return transforms.Compose(transform_list)
+
 
 class ImageDataset(data.Dataset):
     def __init__(self, root, transform):
@@ -37,6 +40,6 @@ class ImageDataset(data.Dataset):
 
     def __len__(self):
         return len(self.paths)
-        
+
     def name(self):
         return 'ImageDataset'

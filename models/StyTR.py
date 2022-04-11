@@ -77,6 +77,7 @@ class PatchEmbed(nn.Module):
     """ 
     Image to Patch Embedding
     """
+
     def __init__(self, img_size=256, patch_size=8, in_chans=3, embed_dim=512):
         super().__init__()
         img_size = to_2tuple(img_size)
@@ -84,7 +85,7 @@ class PatchEmbed(nn.Module):
         num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
         self.img_size = img_size
         self.patch_size = patch_size
-        self.num_patches = num_patches        
+        self.num_patches = num_patches
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
 
     def forward(self, x):
@@ -103,7 +104,8 @@ class MLP(nn.Module):
         super().__init__()
         self.num_layers = num_layers
         h = [hidden_dim] * (num_layers - 1)
-        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
+        self.layers = nn.ModuleList(nn.Linear(n, k)
+                                    for n, k in zip([input_dim] + h, h + [output_dim]))
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
@@ -115,6 +117,7 @@ class VGGFeats(nn.Module):
     """
     VGG Features of an image for calculating perceptual loss.
     """
+
     def __init__(self, pretrained):
         super().__init__()
         # these are actually the vgg layers for extracting features
@@ -136,20 +139,21 @@ class VGGFeats(nn.Module):
         for i in range(5):
             func = getattr(self, 'enc_{:d}'.format(i + 1))
             results.append(func(results[-1]))
-        return results[1:]        
+        return results[1:]
 
 
 class StyTrans(nn.Module):
     """
     This is the main Style Transformer
     """
+
     def __init__(self, args):
         """
         Initialize the main model.
         """
         super().__init__()
         self.embedding = PatchEmbed()
-        self.transformer = transformer.Transformer(dino_encoder=args.dino_encoder)    
+        self.transformer = transformer.Transformer(dino_encoder=args.dino_encoder)
         self.decode = nn.Sequential(
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(self.transformer.d_model, 256, (3, 3)),
@@ -189,11 +193,12 @@ class StyTrans(nn.Module):
             - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
         """
         if isinstance(samples_c, (list, torch.Tensor)):
-            samples_c = nested_tensor_from_tensor_list(samples_c)   # support different-sized images padding is used for mask [tensor, mask] 
+            # support different-sized images padding is used for mask [tensor, mask]
+            samples_c = nested_tensor_from_tensor_list(samples_c)
         if isinstance(samples_s, (list, torch.Tensor)):
-            samples_s = nested_tensor_from_tensor_list(samples_s) 
-        
-        ### Linear projection
+            samples_s = nested_tensor_from_tensor_list(samples_s)
+
+        # Linear projection
         # NOTE: no PatchEmbedding needed if using DINO ViT since those have that built in
         if self.transformer.dino_encoder == "none":
             style = self.embedding(samples_s.tensors)
@@ -206,4 +211,4 @@ class StyTrans(nn.Module):
         mask = None
 
         Ics = self.decode(self.transformer(style, mask, content, pos_c, pos_s))
-        return Ics 
+        return Ics

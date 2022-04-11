@@ -4,25 +4,27 @@ Misc functions, including distributed helpers.
 
 Mostly copy-paste from torchvision references.
 """
+import datetime
 import os
+import pickle
 import subprocess
 import time
 from collections import defaultdict, deque
-import datetime
-import pickle
-from typing import Optional, List
+from typing import List, Optional
 
 import torch
 import torch.distributed as dist
-from torch import Tensor
 
 # needed due to empty tensor bug in pytorch and torchvision 0.5
 import torchvision
+from torch import Tensor
+
 """
 if float(torchvision.__version__[:3]) < 0.7:
     from torchvision.ops import _new_empty_tensor
     from torchvision.ops.misc import _output_size
 """
+
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
@@ -337,7 +339,8 @@ def nested_tensor_from_tensor_list(tensor_list: List[Tensor]):
 def _onnx_nested_tensor_from_tensor_list(tensor_list: List[Tensor]) -> NestedTensor:
     max_size = []
     for i in range(tensor_list[0].dim()):
-        max_size_i = torch.max(torch.stack([img.shape[i] for img in tensor_list]).to(torch.float32)).to(torch.int64)
+        max_size_i = torch.max(torch.stack([img.shape[i]
+                               for img in tensor_list]).to(torch.float32)).to(torch.int64)
         max_size.append(max_size_i)
     max_size = tuple(max_size)
 

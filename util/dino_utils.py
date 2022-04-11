@@ -3,13 +3,13 @@ NOTE: The original utils.py file from the dino repo, some util functions for tra
 """
 
 # Copyright (c) Facebook, Inc. and its affiliates.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,26 +21,28 @@ Misc functions.
 Mostly copy-paste from torchvision references or other public repos like DETR:
 https://github.com/facebookresearch/detr/blob/master/util/misc.py
 """
+
+
+
+
+import datetime
+import math
 import os
+import random
+import subprocess
 import sys
 import time
-import math
-import random
-import datetime
-import subprocess
 from collections import defaultdict, deque
-
 import numpy as np
 import torch
-from torch import nn
 import torch.distributed as dist
 from PIL import ImageFilter, ImageOps
-
-
+from torch import nn
 class GaussianBlur(object):
     """
     Apply Gaussian Blur to the PIL image.
     """
+
     def __init__(self, p=0.5, radius_min=0.1, radius_max=2.):
         self.prob = p
         self.radius_min = radius_min
@@ -62,6 +64,7 @@ class Solarization(object):
     """
     Apply Solarization to the PIL image.
     """
+
     def __init__(self, p):
         self.p = p
 
@@ -107,7 +110,8 @@ def load_pretrained_weights(model, pretrained_weights, checkpoint_key, model_nam
             url = "dino_resnet50_pretrain/dino_resnet50_pretrain.pth"
         if url is not None:
             print("Since no pretrained weights have been provided, we load the reference pretrained DINO weights.")
-            state_dict = torch.hub.load_state_dict_from_url(url="https://dl.fbaipublicfiles.com/dino/" + url)
+            state_dict = torch.hub.load_state_dict_from_url(
+                url="https://dl.fbaipublicfiles.com/dino/" + url)
             model.load_state_dict(state_dict, strict=True)
         else:
             print("There is no reference weights available for this model => We use random weights.")
@@ -127,7 +131,8 @@ def load_pretrained_linear_weights(linear_classifier, model_name, patch_size):
         url = "dino_resnet50_pretrain/dino_resnet50_linearweights.pth"
     if url is not None:
         print("We load the reference pretrained linear weights.")
-        state_dict = torch.hub.load_state_dict_from_url(url="https://dl.fbaipublicfiles.com/dino/" + url)["state_dict"]
+        state_dict = torch.hub.load_state_dict_from_url(
+            url="https://dl.fbaipublicfiles.com/dino/" + url)["state_dict"]
         linear_classifier.load_state_dict(state_dict, strict=True)
     else:
         print("We use random linear weights.")
@@ -195,7 +200,8 @@ def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epoch
         warmup_schedule = np.linspace(start_warmup_value, base_value, warmup_iters)
 
     iters = np.arange(epochs * niter_per_ep - warmup_iters)
-    schedule = final_value + 0.5 * (base_value - final_value) * (1 + np.cos(np.pi * iters / len(iters)))
+    schedule = final_value + 0.5 * (base_value - final_value) * \
+        (1 + np.cos(np.pi * iters / len(iters)))
 
     schedule = np.concatenate((warmup_schedule, schedule))
     assert len(schedule) == epochs * niter_per_ep
@@ -558,6 +564,7 @@ class LARS(torch.optim.Optimizer):
     """
     Almost copy-paste from https://github.com/facebookresearch/barlowtwins/blob/main/main.py
     """
+
     def __init__(self, params, lr=0, weight_decay=0, momentum=0.9, eta=0.001,
                  weight_decay_filter=None, lars_adaptation_filter=None):
         defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum,
@@ -604,6 +611,7 @@ class MultiCropWrapper(nn.Module):
     concatenate all the output features and run the head forward on these
     concatenated features.
     """
+
     def __init__(self, backbone, head):
         super(MultiCropWrapper, self).__init__()
         # disable layers dedicated to ImageNet labels classification
@@ -659,6 +667,7 @@ class PCA():
     """
     Class to  compute and apply PCA.
     """
+
     def __init__(self, dim=256, whit=0.5):
         self.dim = dim
         self.whit = whit
@@ -760,7 +769,7 @@ def compute_map(ranks, gnd, kappas=[]):
     """
 
     map = 0.
-    nq = len(gnd) # number of queries
+    nq = len(gnd)  # number of queries
     aps = np.zeros(nq)
     pr = np.zeros(len(kappas))
     prs = np.zeros((nq, len(kappas)))
@@ -782,11 +791,11 @@ def compute_map(ranks, gnd, kappas=[]):
             qgndj = np.empty(0)
 
         # sorted positions of positive and junk images (0 based)
-        pos  = np.arange(ranks.shape[0])[np.in1d(ranks[:,i], qgnd)]
-        junk = np.arange(ranks.shape[0])[np.in1d(ranks[:,i], qgndj)]
+        pos = np.arange(ranks.shape[0])[np.in1d(ranks[:, i], qgnd)]
+        junk = np.arange(ranks.shape[0])[np.in1d(ranks[:, i], qgndj)]
 
-        k = 0;
-        ij = 0;
+        k = 0
+        ij = 0
         if len(junk):
             # decrease positions of positives based on the number of
             # junk images appearing before them
@@ -804,9 +813,9 @@ def compute_map(ranks, gnd, kappas=[]):
         aps[i] = ap
 
         # compute precision @ k
-        pos += 1 # get it to 1-based
+        pos += 1  # get it to 1-based
         for j in np.arange(len(kappas)):
-            kq = min(max(pos), kappas[j]); 
+            kq = min(max(pos), kappas[j])
             prs[i, j] = (pos <= kq).sum() / kq
         pr = pr + prs[i, :]
 
@@ -822,7 +831,8 @@ def multi_scale(samples, model):
         if s == 1:
             inp = samples.clone()
         else:
-            inp = nn.functional.interpolate(samples, scale_factor=s, mode='bilinear', align_corners=False)
+            inp = nn.functional.interpolate(samples, scale_factor=s,
+                                            mode='bilinear', align_corners=False)
         feats = model(inp).clone()
         if v is None:
             v = feats
