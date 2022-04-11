@@ -157,52 +157,52 @@ if __name__ == '__main__':
     args.arch = args.arch.replace("deit", "vit")
     # if the network is a Vision Transformer (i.e. vit_tiny, vit_small, vit_base)
     if args.arch in vits.__dict__.keys():
-        student_cont, student_sty = vits.__dict__[args.arch](
+        student_cont_encoder, student_sty_encoder = vits.__dict__[args.arch](
             patch_size=args.patch_size,
             drop_path_rate=args.drop_path_rate,  # stochastic depth
         )
-        teacher_cont, teacher_sty = vits.__dict__[args.arch](patch_size=args.patch_size)
-        embed_dim = student_cont.embed_dim
+        teacher_cont_encoder, teacher_sty_encoder = vits.__dict__[args.arch](patch_size=args.patch_size)
+        embed_dim = student_cont_encoder.embed_dim
     # if the network is a XCiT
     elif args.arch in torch.hub.list("facebookresearch/xcit:main"):
-        student_cont, student_sty = torch.hub.load('facebookresearch/xcit:main', args.arch,
+        student_cont_encoder, student_sty_encoder = torch.hub.load('facebookresearch/xcit:main', args.arch,
                                  pretrained=False, drop_path_rate=args.drop_path_rate)
-        teacher_cont, teacher_sty = torch.hub.load('facebookresearch/xcit:main', args.arch, pretrained=False)
-        embed_dim = student_cont.embed_dim
+        teacher_cont_encoder, teacher_sty_encoder = torch.hub.load('facebookresearch/xcit:main', args.arch, pretrained=False)
+        embed_dim = student_cont_encoder.embed_dim
     # otherwise, we check if the architecture is in torchvision models
     elif args.arch in torchvision_models.__dict__.keys():
-        student_cont, student_sty = torchvision_models.__dict__[args.arch]()
-        teacher_cont, teacher_sty = torchvision_models.__dict__[args.arch]()
-        embed_dim = student_cont.fc.weight.shape[1]
+        student_cont_encoder, student_sty_encoder = torchvision_models.__dict__[args.arch]()
+        teacher_cont_encoder, teacher_sty_encoder = torchvision_models.__dict__[args.arch]()
+        embed_dim = student_cont_encoder.fc.weight.shape[1]
     else:
         print(f"Unknow architecture: {args.arch}")
 
     # multi-crop wrapper handles forward with inputs of different resolutions
-    student_cont, student_sty = utils.MultiCropWrapper(student_cont, DINOHead(
+    student_cont_encoder, student_sty_encoder = utils.MultiCropWrapper(student_cont_encoder, DINOHead(
         embed_dim,
         args.out_dim,
         use_bn=args.use_bn_in_head,
         norm_last_layer=args.norm_last_layer,
     ))
-    teacher_cont, teacher_sty = utils.MultiCropWrapper(
-        teacher_cont,
+    teacher_cont_encoder, teacher_sty_encoder = utils.MultiCropWrapper(
+        teacher_cont_encoder,
         DINOHead(embed_dim, args.out_dim, args.use_bn_in_head),
     )
     # move networks to gpu
-    student_cont, teacher_cont, student_sty, teacher_sty = student_cont.cuda(), teacher_cont.cuda(), student_sty.cuda(), teacher_sty.cuda()
+    student_cont_encoder, teacher_cont_encoder, student_sty_encoder, teacher_sty_encoder = student_cont_encoder.cuda(), teacher_cont_encoder.cuda(), student_sty_encoder.cuda(), teacher_sty_encoder.cuda()
     
     # teacher and student start with the same weights
-    teacher_cont.load_state_dict(student_cont.module.state_dict())
-    teacher_sty.load_state_dict(student_sty.module.state_dict())
+    teacher_cont_encoder.load_state_dict(student_cont_encoder.module.state_dict())
+    teacher_sty_encoder.load_state_dict(student_sty_encoder.module.state_dict())
     # there is no backpropagation through the teacher, so no need for gradients
     
-    for p in teacher_cont.parameters():
+    for p in teacher_cont_encoder.parameters():
         p.requires_grad = False
 
-    for p in teacher_sty.parameters():
+    for p in teacher_sty_encoder.parameters():
         p.requires_grad = False
     print(f"Student and Teacher are built: they are both {args.arch} network.")
-    
+
 
     # ============ preparing loss for dino... ============
     dino_loss = DINOLoss(
@@ -242,8 +242,8 @@ if __name__ == '__main__':
                                 {'params': filter(lambda p: p.requires_grad, network.transformer.parameters())},
                                 {'params': network.decode.parameters()},
                                 {'params': network.embedding.parameters()}, 
-                                {'params': utils.get_params_groups(student_cont)}, 
-                                {'params': utils.get_params_groups(student_sty)},             
+                                {'params': utils.get_params_groups(student_cont_encoder)}, 
+                                {'params': utils.get_params_groups(student_sty_encoder)},             
                                 ], lr=args.lr)
 
     if args.amp:
@@ -263,15 +263,27 @@ if __name__ == '__main__':
         style_images = next(style_iter).to(device) 
 
         # pass through model and get loss
+        # TODO: rewrite this part to reduce redundancy
+        
+        auto_cast_enabled = False
         if args.amp:
-            with torch.cuda.amp.autocast():
-                out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(network, vgg, content_images, style_images) 
-        else:
+            auto_cast_enabled = True
+
+        with torch.cuda.amp.autocast(enabled=auto_cast_enabled):
+            # feed content & style images into student and teacher encoders.
+            t_cont_out, t_sty_out = teacher_cont_encoder(content_images[:2]), teacher_sty_encoder(style_images[:2])
+
+            s_cont_out, s_sty_out = student_cont_encoder(content_images), student_sty_encoder(style_images)
+
+            dino_c_loss = dino_loss(s_cont_out, t_cont_out, i)
+            dino_s_loss = dino_loss(s_sty_out, t_sty_out, i)
+
             out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(network, vgg, content_images, style_images) 
+       
             
         loss_c = args.content_weight * loss_c
         loss_s = args.style_weight * loss_s
-        loss = (loss_c + loss_s + (l_identity1 * 70) + (l_identity2 * 1)).sum() / args.gradient_accum_steps
+        loss = (loss_c + loss_s + (l_identity1 * 70) + (l_identity2 * 1)).sum() / args.gradient_accum_steps + dino_c_loss + dino_s_loss
 
         if args.amp:
             scaler.scale(loss).backward()
@@ -312,7 +324,7 @@ if __name__ == '__main__':
             save_image(out, output_name, nrow=args.batch_size)
 
         # cleanup
-        del out, loss, loss_c, loss_s, l_identity1, l_identity2
+        del out, loss, loss_c, loss_s, l_identity1, l_identity2, dino_c_loss, dino_s_loss
 
         if (i + 1) % args.save_model_interval == 0 or (i + 1) == args.max_iter:
             print('learning_rate: %s' % str(optimizer.param_groups[0]['lr']))
