@@ -486,8 +486,9 @@ if __name__ == '__main__':
 
                 student_images = network(student_c_out, student_s_out,
                                          skip_c_encoder, skip_s_encoder)
-                teacher_images = network(teacher_c_out, teacher_s_out,
-                                         skip_c_encoder, skip_s_encoder)
+                with torch.no_grad():
+                    teacher_images = network(teacher_c_out, teacher_s_out,
+                                            skip_c_encoder, skip_s_encoder)
 
                 shape = student_images.shape
                 student_images = student_images.view(
@@ -499,10 +500,12 @@ if __name__ == '__main__':
 
                 dino_s_loss = dino_s_loss_func(student_images, teacher_images, i)
             else:
-                student_c_out = torch.stack(student_c_out)
-                teacher_c_out = torch.stack(teacher_c_out)
+                if isinstance(student_c_out, tuple):
+                    student_c_out = torch.stack(student_c_out)
+                if isinstance(teacher_c_out, tuple):
+                    teacher_c_out = torch.stack(teacher_c_out)
 
-                dino_c_loss = dino_s_loss_func(student_c_out, teacher_c_out, i)
+                dino_s_loss = dino_s_loss_func(student_c_out, teacher_c_out, i)
         elif args.dino_encoder_loss != "target":
             model_style_in = origin_style_images
 
