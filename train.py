@@ -502,7 +502,7 @@ if __name__ == '__main__':
                 student_c_out = torch.stack(student_c_out)
                 teacher_c_out = torch.stack(teacher_c_out)
 
-                dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
+                dino_c_loss = dino_s_loss_func(student_c_out, teacher_c_out, i)
         elif args.dino_encoder_loss != "target":
             model_style_in = origin_style_images
 
