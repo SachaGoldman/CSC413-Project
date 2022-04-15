@@ -84,7 +84,10 @@ class Transformer(nn.Module):
                 # content-aware positional embedding
                 content_pool = self.averagepooling(content)
                 pos_c = self.new_ps(content_pool)
-                pos_embed_c = F.interpolate(pos_c, mode='bilinear', size=style.shape[-2:])
+                if not skip_s_encoder:
+                    pos_embed_c = F.interpolate(pos_c, mode='bilinear', size=style.shape[-2:])
+                else:
+                    pos_embed_c = F.interpolate(pos_c, mode='bilinear', size=content.shape[-2:])
 
                 content = content.flatten(2).permute(2, 0, 1)
                 if pos_embed_c is not None:
