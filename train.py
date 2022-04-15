@@ -444,8 +444,6 @@ if __name__ == '__main__':
                 student_c_out = torch.stack(student_c_out)
                 teacher_c_out = torch.stack(teacher_c_out)
 
-                print(student_c_out[0].shape)
-
                 dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
         elif args.dino_encoder_loss != "target":
             model_content_in = origin_content_images
@@ -503,8 +501,6 @@ if __name__ == '__main__':
             else:
                 student_c_out = torch.stack(student_c_out)
                 teacher_c_out = torch.stack(teacher_c_out)
-
-                print(student_c_out[0].shape)
 
                 dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
         elif args.dino_encoder_loss != "target":
