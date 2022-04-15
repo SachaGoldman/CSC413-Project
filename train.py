@@ -66,8 +66,8 @@ def get_loss(model, vgg, content_input, style_input, origin_content, origin_styl
         - ready_images: (Ics, Icc, Iss) that are already calculated. default=none
     """
     Ics = model(content_input, style_input, skip_c_encoder, skip_s_encoder)
-    Icc = model(content_input, content_input, skip_c_encoder, skip_s_encoder)
-    Iss = model(style_input, style_input, skip_c_encoder, skip_s_encoder)
+    Icc = model(content_input, content_input, skip_c_encoder, skip_c_encoder)
+    Iss = model(style_input, style_input, skip_s_encoder, skip_s_encoder)
     with torch.no_grad():
         content_feats = vgg(origin_content)
         style_feats = vgg(origin_style)
@@ -274,6 +274,8 @@ if __name__ == '__main__':
     teacher_transformer = Transformer(dino_encoder="none")
     teacher_encoder_c = teacher_transformer.encoder_c
     teacher_encoder_s = teacher_transformer.encoder_s
+    teacher_encoder_s.to(device)
+    teacher_encoder_c.to(device)
 
     student_encoder_c = network.transformer.encoder_c
     student_encoder_s = network.transformer.encoder_s
@@ -395,7 +397,8 @@ if __name__ == '__main__':
                     student_encoding_c = resize_image(student_encoding_c, student_c_out[ind - 1].size(0), 21)
                 student_c_out.append(student_encoding_c)
                 if ind < 2:
-                    teacher_c_out.append(teacher_encoder_c(c_images_batch))
+                    with torch.no_grad():
+                        teacher_c_out.append(teacher_encoder_c(c_images_batch))
             # compute dino loss
             student_c_out = torch.stack(student_c_out)
             teacher_c_out = torch.stack(teacher_c_out)
@@ -419,7 +422,8 @@ if __name__ == '__main__':
                     student_encoding_s = resize_image(student_encoding_s, student_s_out[ind - 1].size(0), 21)
                 student_s_out.append(student_encoding_s)
                 if ind < 2:
-                    teacher_s_out.append(teacher_encoder_s(s_images_batch))
+                    with torch.no_grad():
+                        teacher_s_out.append(teacher_encoder_s(s_images_batch))
             student_s_out = torch.stack(student_s_out)
             teacher_s_out = torch.stack(teacher_s_out)
             dino_s_loss = dino_s_loss_func(student_s_out, teacher_s_out, i)
