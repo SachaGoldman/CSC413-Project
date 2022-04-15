@@ -13,4 +13,7 @@ python ./train.py \
     --batch_size 8 \
     --n_threads 4 \
     --save_model_interval 500 \
-    --dino_encoder none
+    --dino_encoder none \
+    --dino_c_encoder_training False \
+    --dino_s_encoder_training True \
+    --dino_encoder_loss target

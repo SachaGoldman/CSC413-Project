@@ -4,6 +4,7 @@ TODO: add DINO training as a possible thing through a flag
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -17,14 +18,14 @@ from torchvision.utils import save_image
 from tqdm import tqdm
 
 import models.StyTR as StyTR
-from models.transformer import Transformer, TransformerEncoder
 import util.dino_utils as utils
-from util.misc import nested_tensor_from_tensor_list
 import vision_transformer as vits
 from function import calc_mean_std, normal, normal_style
 from ImageDataset import ImageDataset, train_transform
 from main_dino import DataAugmentationDINO
+from models.transformer import Transformer, TransformerEncoder
 from sampler import InfiniteSamplerWrapper
+from util.misc import nested_tensor_from_tensor_list
 
 
 def adjust_learning_rate(optimizer, iteration_count):
@@ -96,12 +97,14 @@ def get_loss(model, vgg, content_input, style_input, origin_content, origin_styl
 
     return Ics.detach(), loss_c, loss_s, loss_lambda1, loss_lambda2
 
+
 def encoder_pre_process(sample_images, embedding):
     if isinstance(sample_images, (list, torch.Tensor)):
         sample_images = nested_tensor_from_tensor_list(sample_images)
 
     result = embedding(sample_images.tensors).flatten(2).permute(2, 0, 1)
     return result
+
 
 class DINOLoss_new(nn.Module):
     def __init__(self, warmup_teacher_temp, teacher_temp,
@@ -153,6 +156,7 @@ class DINOLoss_new(nn.Module):
 
         # ema update
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
+
 
 def resize_image(images, new_hw, kernel):
     """
@@ -208,7 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--dino_c_encoder_training', type=utils.bool_flag, default=False,
                         help="Use the dino training procedure for the content encoder")
     parser.add_argument('--dino_encoder_loss', default="none", type=str,
-                        help="If using the dino training procedure, decide which loss to use", choices=("none", "embedded"))
+                        help="If using the dino training procedure, decide which loss to use", choices=("none", "embedded", "target"))
 
     # additional flags for training implemented
     parser.add_argument('--amp', action='store_true',
@@ -228,7 +232,6 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_teacher_temp_epochs', default=0, type=int,
                         help='Number of warmup epochs for the teacher temperature (Default: 30).')
 
-
     # Multi-crop parameters
     parser.add_argument('--global_crops_scale', type=float, nargs='+', default=(0.4, 1.),
                         help="""Scale range of the cropped image before resizing, relatively to the origin image.
@@ -242,6 +245,10 @@ if __name__ == '__main__':
         Used for small local view cropping of multi-crop.""")
 
     args = parser.parse_args()
+
+    # We aren't openAI
+    if args.dino_s_encoder_training and args.dino_c_encoder_training and args.dino_encoder_loss == "target":
+        sys.exit("Arguments unsupported due to computational cost.")
 
     USE_CUDA = torch.cuda.is_available()
     device = torch.device("cuda" if USE_CUDA else "cpu")
@@ -284,7 +291,6 @@ if __name__ == '__main__':
     skip_s_encoder = False
     skip_c_encoder = False
 
-
     ### Create Dataset and DataLoader ###
     content_tf = train_transform()
     style_tf = train_transform()
@@ -293,34 +299,33 @@ if __name__ == '__main__':
 
     if args.dino_s_encoder_training:
         dino_style_tf = DataAugmentationDINO(
-        args.global_crops_scale,
-        args.local_crops_scale,
-        args.local_crops_number,
+            args.global_crops_scale,
+            args.local_crops_scale,
+            args.local_crops_number,
         )
         skip_s_encoder = True
         dino_style_dataset = ImageDataset(args.style_dir, dino_style_tf)
 
         dino_style_iter = iter(data.DataLoader(
-        dino_style_dataset, batch_size=args.batch_size,
-        sampler=InfiniteSamplerWrapper(dino_style_dataset),
-        num_workers=args.n_threads))
+            dino_style_dataset, batch_size=args.batch_size,
+            sampler=InfiniteSamplerWrapper(dino_style_dataset),
+            num_workers=args.n_threads))
 
-    
     if args.dino_c_encoder_training:
         dino_content_tf = DataAugmentationDINO(
-        args.global_crops_scale,
-        args.local_crops_scale,
-        args.local_crops_number,
+            args.global_crops_scale,
+            args.local_crops_scale,
+            args.local_crops_number,
         )
         skip_c_encoder = True
         dino_content_dataset = ImageDataset(args.content_dir, dino_content_tf)
 
         dino_content_iter = iter(data.DataLoader(
-        dino_content_dataset, batch_size=args.batch_size,
-        sampler=InfiniteSamplerWrapper(dino_content_dataset),
-        num_workers=args.n_threads))
-    
-    # ======= dino loss ======= # 
+            dino_content_dataset, batch_size=args.batch_size,
+            sampler=InfiniteSamplerWrapper(dino_content_dataset),
+            num_workers=args.n_threads))
+
+    # ======= dino loss ======= #
     dino_c_loss_func = DINOLoss_new(
         args.warmup_teacher_temp,
         args.teacher_temp,
@@ -334,8 +339,8 @@ if __name__ == '__main__':
         args.warmup_teacher_temp_epochs,
         args.max_iter,
     ).to(device)
-    
-     ### Create Dataset and DataLoader ###
+
+    ### Create Dataset and DataLoader ###
     content_tf = train_transform()
     style_tf = train_transform()
 
@@ -381,20 +386,21 @@ if __name__ == '__main__':
         origin_content_images = next(content_iter).to(device)
         origin_style_images = next(style_iter).to(device)
 
-
+        # TODO Sacha use a different loss if relevant
         # experiment 3
         if args.dino_c_encoder_training:
             dino_content_images = next(dino_content_iter)
             student_c_out = []
             teacher_c_out = []
-             # apply teacher and student to each of the dino-preprocessed image
+            # apply teacher and student to each of the dino-preprocessed image
             # teacher is only applied to the first two global views
             for ind, c_images_batch in enumerate(dino_content_images):
                 c_images_batch.to(device)
                 c_images_batch = encoder_pre_process(c_images_batch, network.embedding)
                 student_encoding_c = student_encoder_c(c_images_batch)
                 if ind >= 2:
-                    student_encoding_c = resize_image(student_encoding_c, student_c_out[ind - 1].size(0), 21)
+                    student_encoding_c = resize_image(
+                        student_encoding_c, student_c_out[ind - 1].size(0), 21)
                 student_c_out.append(student_encoding_c)
                 if ind < 2:
                     with torch.no_grad():
@@ -404,12 +410,13 @@ if __name__ == '__main__':
             teacher_c_out = torch.stack(teacher_c_out)
             dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
 
-            # this is the content encoding that will be passed 
+            # this is the content encoding that will be passed
             # into model (skip encoder since it's already encoded)
             model_content_in = 0.5 * (student_c_out[0] + student_c_out[1])
         else:
             model_content_in = origin_content_images
 
+        # TODO Sacha use a different loss if relevant
         if args.dino_s_encoder_training:
             dino_style_images = next(dino_style_iter)
             student_s_out = []
@@ -419,7 +426,8 @@ if __name__ == '__main__':
                 s_images_batch = encoder_pre_process(s_images_batch, network.embedding)
                 student_encoding_s = student_encoder_s(s_images_batch)
                 if ind >= 2:
-                    student_encoding_s = resize_image(student_encoding_s, student_s_out[ind - 1].size(0), 21)
+                    student_encoding_s = resize_image(
+                        student_encoding_s, student_s_out[ind - 1].size(0), 21)
                 student_s_out.append(student_encoding_s)
                 if ind < 2:
                     with torch.no_grad():
@@ -428,23 +436,22 @@ if __name__ == '__main__':
             teacher_s_out = torch.stack(teacher_s_out)
             dino_s_loss = dino_s_loss_func(student_s_out, teacher_s_out, i)
 
-            # this is the style encoding that will be passed 
+            # this is the style encoding that will be passed
             # into model (skip encoder since it's already encoded)
             model_style_in = 0.5 * (student_s_out[0] + student_s_out[1])
         else:
             model_style_in = origin_style_images
 
-
         # pass through model and get loss
         if args.amp:
             with torch.cuda.amp.autocast():
                 out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(
-                    network, vgg, model_content_in, model_style_in, 
+                    network, vgg, model_content_in, model_style_in,
                     origin_content_images, origin_style_images,
                     skip_c_encoder, skip_s_encoder)
         else:
             out, loss_c, loss_s, l_identity1, l_identity2 = get_loss(
-                network, vgg, model_content_in, model_style_in, 
+                network, vgg, model_content_in, model_style_in,
                 origin_content_images, origin_style_images,
                 skip_c_encoder, skip_s_encoder)
 
@@ -452,14 +459,13 @@ if __name__ == '__main__':
         loss_s = args.style_weight * loss_s
         loss = (loss_c + loss_s + (l_identity1 * 70) +
                 (l_identity2 * 1)).sum() / args.gradient_accum_steps
-        
+
         if args.dino_c_encoder_training:
             loss += dino_c_loss
-        
+
         if args.dino_s_encoder_training:
             loss += dino_s_loss
 
- 
         if args.amp:
             scaler.scale(loss).backward()
             if i % args.gradient_accum_steps == 0:
@@ -485,10 +491,8 @@ if __name__ == '__main__':
         if args.dino_c_encoder_training:
             print("student & teacher content loss: ", dino_c_loss.sum().cpu().detach().numpy())
 
-
         if args.dino_s_encoder_training:
             print("student & teacher style loss: ", dino_s_loss.sum().cpu().detach().numpy())
-
 
         # write logging stats to Tensorboard
         writer.add_scalar('loss_content', loss_c.sum().item(), i + 1)
@@ -511,7 +515,7 @@ if __name__ == '__main__':
 
         if args.dino_c_encoder_training:
             del dino_c_loss
-        
+
         if args.dino_s_encoder_training:
             del dino_s_loss
 
