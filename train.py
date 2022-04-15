@@ -169,7 +169,7 @@ def resize_image(images, new_hw, kernel):
     C = images.size(1)
     hw = images.size(2)
     p = (new_hw + kernel - 1 - hw) // 2
-    conv = nn.Conv1d(in_channels=C, out_channels=C, kernel_size=kernel, padding=p)
+    conv = nn.Conv1d(in_channels=C, out_channels=C, kernel_size=kernel, padding=p).to(device)
     resized_im = conv(images)
     return resized_im.permute(2, 0, 1)
 
@@ -395,7 +395,7 @@ if __name__ == '__main__':
             # apply teacher and student to each of the dino-preprocessed image
             # teacher is only applied to the first two global views
             for ind, c_images_batch in enumerate(dino_content_images):
-                c_images_batch.to(device)
+                c_images_batch = c_images_batch.to(device)
                 c_images_batch = encoder_pre_process(c_images_batch, network.embedding)
                 student_encoding_c = student_encoder_c(c_images_batch)
                 if ind >= 2:
@@ -422,7 +422,7 @@ if __name__ == '__main__':
             student_s_out = []
             teacher_s_out = []
             for ind, s_images_batch in enumerate(dino_style_images):
-                s_images_batch.to(device)
+                s_images_batch = s_images_batch.to(device)
                 s_images_batch = encoder_pre_process(s_images_batch, network.embedding)
                 student_encoding_s = student_encoder_s(s_images_batch)
                 if ind >= 2:
