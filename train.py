@@ -67,8 +67,8 @@ def get_loss(model, vgg, content_input, style_input, origin_content, origin_styl
         - ready_images: (Ics, Icc, Iss) that are already calculated. default=none
     """
     Ics = model(content_input, style_input, skip_c_encoder, skip_s_encoder)
-    Icc = model(content_input, content_input, skip_c_encoder, skip_s_encoder)
-    Iss = model(style_input, style_input, skip_c_encoder, skip_s_encoder)
+    Icc = model(content_input, content_input, skip_c_encoder, skip_c_encoder)
+    Iss = model(style_input, style_input, skip_s_encoder, skip_s_encoder)
     with torch.no_grad():
         content_feats = vgg(origin_content)
         style_feats = vgg(origin_style)
@@ -161,7 +161,7 @@ class DINOLoss_new(nn.Module):
 def resize_image(images, new_hw, kernel):
     """
     expect images to have shape (HW, N, C)
-    apply 1-D convolution to resize image to 
+    apply 1-D convolution to resize image to
     (new_hw, N, C)
     """
     # permute shape to (N, C, HW)
@@ -295,14 +295,18 @@ if __name__ == '__main__':
 
     # ======== image preprocessing modules and datasets for dino method ======== #
 
+    skip_s_encoder = args.dino_s_encoder_training or args.dino_encoder_loss == "target"
+    skip_c_encoder = args.dino_c_encoder_training or args.dino_encoder_loss == "target"
+
     if args.dino_s_encoder_training:
         dino_style_tf = DataAugmentationDINO(
             args.global_crops_scale,
             args.local_crops_scale,
             args.local_crops_number,
         )
-        skip_s_encoder = True
+
         dino_style_dataset = ImageDataset(args.style_dir, dino_style_tf)
+        n = ImageDataset(args.style_dir, dino_style_tf)
 
         dino_style_iter = iter(data.DataLoader(
             dino_style_dataset, batch_size=args.batch_size,
@@ -315,7 +319,6 @@ if __name__ == '__main__':
             args.local_crops_scale,
             args.local_crops_number,
         )
-        skip_c_encoder = True
         dino_content_dataset = ImageDataset(args.content_dir, dino_content_tf)
 
         dino_content_iter = iter(data.DataLoader(
@@ -402,15 +405,46 @@ if __name__ == '__main__':
                 student_c_out.append(student_encoding_c)
                 if ind < 2:
                     teacher_c_out.append(teacher_encoder_c(c_images_batch))
-            # compute dino loss
-            student_c_out = torch.stack(student_c_out)
-            teacher_c_out = torch.stack(teacher_c_out)
-            dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
 
             # this is the content encoding that will be passed
             # into model (skip encoder since it's already encoded)
             model_content_in = 0.5 * (student_c_out[0] + student_c_out[1])
-        else:
+
+            # compute dino loss
+            if args.dino_encoder_loss == "target":
+                # Grab the style
+                pre_processed_style = encoder_pre_process(origin_style_images, network.embedding)
+                model_style_in = network.transformer.encoder_s(
+                    pre_processed_style, src_key_padding_mask=None, pos=None)
+
+                student_c_out = torch.cat(student_c_out, 1)
+                teacher_c_out = torch.cat(teacher_c_out, 1)
+
+                student_s_out = torch.tile(pre_processed_style, (1, args.local_crops_number + 2, 1))
+                teacher_s_out = torch.tile(pre_processed_style, (1, 2, 1))
+
+                student_images = network(student_c_out, student_s_out,
+                                         skip_c_encoder, skip_s_encoder)
+                teacher_images = network(teacher_c_out, teacher_s_out,
+                                         skip_c_encoder, skip_s_encoder)
+
+                shape = student_images.shape
+                student_images = student_images.view(
+                    (shape[0] // args.batch_size, args.batch_size) + (shape[1:]))
+
+                shape = teacher_images.shape
+                teacher_images = teacher_images.view(
+                    (shape[0] // args.batch_size, args.batch_size) + (shape[1:]))
+
+                dino_c_loss = dino_c_loss_func(student_images, teacher_images, i)
+            else:
+                student_c_out = torch.stack(student_c_out)
+                teacher_c_out = torch.stack(teacher_c_out)
+
+                print(student_c_out[0].shape)
+
+                dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
+        elif args.dino_encoder_loss != "target":
             model_content_in = origin_content_images
 
         # TODO Sacha use a different loss if relevant
@@ -428,14 +462,48 @@ if __name__ == '__main__':
                 student_s_out.append(student_encoding_s)
                 if ind < 2:
                     teacher_s_out.append(teacher_encoder_s(s_images_batch))
-            student_s_out = torch.stack(student_s_out)
-            teacher_s_out = torch.stack(teacher_s_out)
-            dino_s_loss = dino_s_loss_func(student_s_out, teacher_s_out, i)
 
-            # this is the style encoding that will be passed
+            # this is the content encoding that will be passed
             # into model (skip encoder since it's already encoded)
             model_style_in = 0.5 * (student_s_out[0] + student_s_out[1])
-        else:
+
+            # compute dino loss
+            if args.dino_encoder_loss == "target":
+                # Grab the style
+                pre_processed_content = encoder_pre_process(
+                    origin_content_images, network.embedding)
+                model_content_in = network.transformer.encoder_c(
+                    pre_processed_content, src_key_padding_mask=None, pos=None)
+
+                student_s_out = torch.cat(student_s_out, 1)
+                teacher_s_out = torch.cat(teacher_s_out, 1)
+
+                student_c_out = torch.tile(pre_processed_content,
+                                           (1, args.local_crops_number + 2, 1))
+                teacher_c_out = torch.tile(pre_processed_content, (1, 2, 1))
+
+                student_images = network(student_c_out, student_s_out,
+                                         skip_c_encoder, skip_s_encoder)
+                teacher_images = network(teacher_c_out, teacher_s_out,
+                                         skip_c_encoder, skip_s_encoder)
+
+                shape = student_images.shape
+                student_images = student_images.view(
+                    (shape[0] // args.batch_size, args.batch_size) + (shape[1:]))
+
+                shape = teacher_images.shape
+                teacher_images = teacher_images.view(
+                    (shape[0] // args.batch_size, args.batch_size) + (shape[1:]))
+
+                dino_s_loss = dino_s_loss_func(student_images, teacher_images, i)
+            else:
+                student_c_out = torch.stack(student_c_out)
+                teacher_c_out = torch.stack(teacher_c_out)
+
+                print(student_c_out[0].shape)
+
+                dino_c_loss = dino_c_loss_func(student_c_out, teacher_c_out, i)
+        elif args.dino_encoder_loss != "target":
             model_style_in = origin_style_images
 
         # pass through model and get loss

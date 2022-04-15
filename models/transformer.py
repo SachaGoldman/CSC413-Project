@@ -75,7 +75,7 @@ class Transformer(nn.Module):
             for p in self.decoder.parameters():
                 if p.dim() > 1:
                     nn.init.xavier_uniform_(p)
-    
+
     def forward(self, style, mask, content, pos_embed_c, pos_embed_s, skip_c_encoder=False, skip_s_encoder=False):
         # skip_s_encoder and skip_c_encoder indicate whether style & content should
         # be passed through encoders.
@@ -89,12 +89,12 @@ class Transformer(nn.Module):
                 content = content.flatten(2).permute(2, 0, 1)
                 if pos_embed_c is not None:
                     pos_embed_c = pos_embed_c.flatten(2).permute(2, 0, 1)
-                
+
                 content = self.encoder_c(content, src_key_padding_mask=mask, pos=pos_embed_c)
             else:
                 content = self.encoder_c(content)
                 content = content.permute(1, 0, 2)
-        
+
         if not skip_s_encoder:
             if self.dino_encoder == "none":
                 # flatten NxCxHxW to HWxNxC
