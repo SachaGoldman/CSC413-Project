@@ -6,11 +6,16 @@ then
 fi
 
 python ./train.py \
-    --content_dir ./datasets/cocotrain2014_small \
-    --style_dir ./datasets/wikiart_small \
+    --content_dir ./datasets/cocotrain2014 \
+    --style_dir ./datasets/wikiart \
     --vgg ./weights/vgg_normalised.pth \
-    --max_iter 1000 \
-    --batch_size 8 \
+    --save_dir ./experiment1 \
+    --log_dir ./logs1 \
+    --lr_decay 2.5e-6 \
+    --max_iter 640000 \
+    --batch_size 2 \
     --n_threads 4 \
-    --save_model_interval 500 \
-    --dino_encoder none
+    --save_model_interval 50000 \
+    --dino_encoder vits8 \
+    --gradient_accum_steps 4 \
+    --amp
