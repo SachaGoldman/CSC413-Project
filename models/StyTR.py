@@ -186,29 +186,60 @@ class StyTrans(nn.Module):
             nn.Conv2d(64, 3, (3, 3)),
         )
 
-    def forward(self, samples_c: NestedTensor, samples_s: NestedTensor):
+    def forward(self, samples_c: NestedTensor, samples_s: NestedTensor, skip_c_encoder=False, skip_s_encoder=True):
         """
         The forward expects a NestedTensor, which consists of:
             - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
             - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
         """
-        if isinstance(samples_c, (list, torch.Tensor)):
-            # support different-sized images padding is used for mask [tensor, mask]
-            samples_c = nested_tensor_from_tensor_list(samples_c)
-        if isinstance(samples_s, (list, torch.Tensor)):
-            samples_s = nested_tensor_from_tensor_list(samples_s)
-
-        # Linear projection
-        # NOTE: no PatchEmbedding needed if using DINO ViT since those have that built in
-        if self.transformer.dino_encoder == "none":
-            style = self.embedding(samples_s.tensors)
-            content = self.embedding(samples_c.tensors)
+        if skip_c_encoder:
+            content = samples_c
         else:
-            style = samples_s.tensors
-            content = samples_c.tensors
+            if isinstance(samples_c, (list, torch.Tensor)):
+                # support different-sized images padding is used for mask [tensor, mask]
+                samples_c = nested_tensor_from_tensor_list(samples_c)
+            if self.transformer.dino_encoder == "none":
+                content = self.embedding(samples_c.tensors)
+            else:
+                content = samples_c.tensors
+
+        if skip_s_encoder:
+            style = samples_s
+        else:
+            if isinstance(samples_s, (list, torch.Tensor)):
+                samples_s = nested_tensor_from_tensor_list(samples_s)
+            # Linear projection
+            # NOTE: no PatchEmbedding needed if using DINO ViT since those have that built in
+            if self.transformer.dino_encoder == "none":
+                style = self.embedding(samples_s.tensors)
+            else:
+                style = samples_s.tensors
+
         pos_s = None
         pos_c = None
         mask = None
 
-        Ics = self.decode(self.transformer(style, mask, content, pos_c, pos_s))
+        Ics = self.decode(self.transformer(style, mask, content, pos_c, pos_s, skip_c_encoder, skip_s_encoder))
         return Ics
+
+
+        # if isinstance(samples_c, (list, torch.Tensor)):
+        #     # support different-sized images padding is used for mask [tensor, mask]
+        #     samples_c = nested_tensor_from_tensor_list(samples_c)
+        # if isinstance(samples_s, (list, torch.Tensor)):
+        #     samples_s = nested_tensor_from_tensor_list(samples_s)
+
+        # # Linear projection
+        # # NOTE: no PatchEmbedding needed if using DINO ViT since those have that built in
+        # if self.transformer.dino_encoder == "none":
+        #     style = self.embedding(samples_s.tensors)
+        #     content = self.embedding(samples_c.tensors)
+        # else:
+        #     style = samples_s.tensors
+        #     content = samples_c.tensors
+        # pos_s = None
+        # pos_c = None
+        # mask = None
+
+        # Ics = self.decode(self.transformer(style, mask, content, pos_c, pos_s))
+        # return Ics

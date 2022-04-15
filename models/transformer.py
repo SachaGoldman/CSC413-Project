@@ -75,30 +75,36 @@ class Transformer(nn.Module):
             for p in self.decoder.parameters():
                 if p.dim() > 1:
                     nn.init.xavier_uniform_(p)
+    
+    def forward(self, style, mask, content, pos_embed_c, pos_embed_s, skip_c_encoder=False, skip_s_encoder=False):
+        # skip_s_encoder and skip_c_encoder indicate whether style & content should
+        # be passed through encoders.
+        if not skip_c_encoder:
+            if self.dino_encoder == "none":
+                # content-aware positional embedding
+                content_pool = self.averagepooling(content)
+                pos_c = self.new_ps(content_pool)
+                pos_embed_c = F.interpolate(pos_c, mode='bilinear', size=style.shape[-2:])
 
-    def forward(self, style, mask, content, pos_embed_c, pos_embed_s):
-        if self.dino_encoder == "none":
-            # content-aware positional embedding
-            content_pool = self.averagepooling(content)
-            pos_c = self.new_ps(content_pool)
-            pos_embed_c = F.interpolate(pos_c, mode='bilinear', size=style.shape[-2:])
-
-            # flatten NxCxHxW to HWxNxC
-            style = style.flatten(2).permute(2, 0, 1)
-            if pos_embed_s is not None:
-                pos_embed_s = pos_embed_s.flatten(2).permute(2, 0, 1)
-
-            content = content.flatten(2).permute(2, 0, 1)
-            if pos_embed_c is not None:
-                pos_embed_c = pos_embed_c.flatten(2).permute(2, 0, 1)
-
-            style = self.encoder_s(style, src_key_padding_mask=mask, pos=pos_embed_s)
-            content = self.encoder_c(content, src_key_padding_mask=mask, pos=pos_embed_c)
-        else:
-            style = self.encoder_s(style)
-            content = self.encoder_c(content)
-            style = style.permute(1, 0, 2)
-            content = content.permute(1, 0, 2)
+                content = content.flatten(2).permute(2, 0, 1)
+                if pos_embed_c is not None:
+                    pos_embed_c = pos_embed_c.flatten(2).permute(2, 0, 1)
+                
+                content = self.encoder_c(content, src_key_padding_mask=mask, pos=pos_embed_c)
+            else:
+                content = self.encoder_c(content)
+                content = content.permute(1, 0, 2)
+        
+        if not skip_s_encoder:
+            if self.dino_encoder == "none":
+                # flatten NxCxHxW to HWxNxC
+                style = style.flatten(2).permute(2, 0, 1)
+                if pos_embed_s is not None:
+                    pos_embed_s = pos_embed_s.flatten(2).permute(2, 0, 1)
+                style = self.encoder_s(style, src_key_padding_mask=mask, pos=pos_embed_s)
+            else:
+                style = self.encoder_s(style)
+                style = style.permute(1, 0, 2)
 
         hs = self.decoder(content, style, memory_key_padding_mask=mask,
                           pos=pos_embed_s, query_pos=pos_embed_c)[0]
@@ -110,6 +116,41 @@ class Transformer(nn.Module):
         hs = hs.view(B, C, -1, H)
 
         return hs
+
+    # def forward(self, style, mask, content, pos_embed_c, pos_embed_s):
+    #     if self.dino_encoder == "none":
+    #         # content-aware positional embedding
+    #         content_pool = self.averagepooling(content)
+    #         pos_c = self.new_ps(content_pool)
+    #         pos_embed_c = F.interpolate(pos_c, mode='bilinear', size=style.shape[-2:])
+
+    #         # flatten NxCxHxW to HWxNxC
+    #         style = style.flatten(2).permute(2, 0, 1)
+    #         if pos_embed_s is not None:
+    #             pos_embed_s = pos_embed_s.flatten(2).permute(2, 0, 1)
+
+    #         content = content.flatten(2).permute(2, 0, 1)
+    #         if pos_embed_c is not None:
+    #             pos_embed_c = pos_embed_c.flatten(2).permute(2, 0, 1)
+
+    #         style = self.encoder_s(style, src_key_padding_mask=mask, pos=pos_embed_s)
+    #         content = self.encoder_c(content, src_key_padding_mask=mask, pos=pos_embed_c)
+    #     else:
+    #         style = self.encoder_s(style)
+    #         content = self.encoder_c(content)
+    #         style = style.permute(1, 0, 2)
+    #         content = content.permute(1, 0, 2)
+
+    #     hs = self.decoder(content, style, memory_key_padding_mask=mask,
+    #                       pos=pos_embed_s, query_pos=pos_embed_c)[0]
+
+    #     # HWxNxC to NxCxHxW to
+    #     N, B, C = hs.shape
+    #     H = int(np.sqrt(N))
+    #     hs = hs.permute(1, 2, 0)
+    #     hs = hs.view(B, C, -1, H)
+
+    #     return hs
 
 
 class TransformerEncoder(nn.Module):

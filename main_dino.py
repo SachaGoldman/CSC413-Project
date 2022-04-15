@@ -447,7 +447,7 @@ class DataAugmentationDINO(object):
 
         # first global crop
         self.global_transfo1 = transforms.Compose([
-            transforms.RandomResizedCrop(224, scale=global_crops_scale,
+            transforms.RandomResizedCrop(256, scale=global_crops_scale,
                                          interpolation=Image.BICUBIC),
             flip_and_color_jitter,
             utils.GaussianBlur(1.0),
@@ -455,7 +455,7 @@ class DataAugmentationDINO(object):
         ])
         # second global crop
         self.global_transfo2 = transforms.Compose([
-            transforms.RandomResizedCrop(224, scale=global_crops_scale,
+            transforms.RandomResizedCrop(256, scale=global_crops_scale,
                                          interpolation=Image.BICUBIC),
             flip_and_color_jitter,
             utils.GaussianBlur(0.1),
