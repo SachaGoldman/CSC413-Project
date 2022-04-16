@@ -11,23 +11,29 @@ def calc_mean_std(feat, eps=1e-5):
     feat_mean = feat.view(N, C, -1).mean(dim=2).view(N, C, 1, 1)
     return feat_mean, feat_std
 
+
 def calc_mean_std1(feat, eps=1e-5):
     # eps is a small value added to the variance to avoid divide-by-zero.
     size = feat.size()
     # assert (len(size) == 4)
-    WH,N, C = size
+    WH, N, C = size
     feat_var = feat.var(dim=0) + eps
     feat_std = feat_var.sqrt()
     feat_mean = feat.mean(dim=0)
     return feat_mean, feat_std
+
+
 def normal(feat, eps=1e-5):
-    feat_mean, feat_std= calc_mean_std(feat, eps)
-    normalized=(feat-feat_mean)/feat_std
-    return normalized 
-def normal_style(feat, eps=1e-5):
-    feat_mean, feat_std= calc_mean_std1(feat, eps)
-    normalized=(feat-feat_mean)/feat_std
+    feat_mean, feat_std = calc_mean_std(feat, eps)
+    normalized = (feat-feat_mean)/feat_std
     return normalized
+
+
+def normal_style(feat, eps=1e-5):
+    feat_mean, feat_std = calc_mean_std1(feat, eps)
+    normalized = (feat-feat_mean)/feat_std
+    return normalized
+
 
 def _calc_feat_flatten_mean_std(feat):
     # takes 3D feat (C, H, W), return mean and std of array within channels
@@ -67,7 +73,7 @@ def coral(source, target):
     )
 
     source_f_transfer = source_f_norm_transfer * \
-                        target_f_std.expand_as(source_f_norm) + \
-                        target_f_mean.expand_as(source_f_norm)
+        target_f_std.expand_as(source_f_norm) + \
+        target_f_mean.expand_as(source_f_norm)
 
     return source_f_transfer.view(source.size())

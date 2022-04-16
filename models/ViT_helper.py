@@ -1,5 +1,10 @@
+import warnings
+import math
+from itertools import repeat
+import collections.abc as container_abcs
 import torch
 from torch import nn
+
 
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -22,6 +27,7 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
     """
+
     def __init__(self, drop_prob=None):
         super(DropPath, self).__init__()
         self.drop_prob = drop_prob
@@ -29,9 +35,9 @@ class DropPath(nn.Module):
     def forward(self, x):
         return drop_path(x, self.drop_prob, self.training)
 
-from itertools import repeat
+
 #from torch._six import container_abcs
-import collections.abc as container_abcs
+
 
 # From PyTorch internals
 def _ntuple(n):
@@ -46,12 +52,6 @@ to_1tuple = _ntuple(1)
 to_2tuple = _ntuple(2)
 to_3tuple = _ntuple(3)
 to_4tuple = _ntuple(4)
-
-
-
-import torch
-import math
-import warnings
 
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):

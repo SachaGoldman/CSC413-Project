@@ -1,4 +1,5 @@
 **/*.DS_store
+**/__pycache__
 .texpadtmp
 **/Proposal.pdf
 **/Paper.pdf
@@ -8,6 +9,12 @@
 **.blg
 **.aux
 **.gz
+**.zip
+**.nfs**
+venv
+.ipynb_checkpoints/
 
 weights
-dataset
+datasets
+experiment*
+logs*

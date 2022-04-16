@@ -1,13 +1,13 @@
 """
 Plotting utilities to visualize training logs.
 """
-import torch
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 from pathlib import Path, PurePath
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import torch
 
 
 def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col=0, log_name='log.txt'):
@@ -39,7 +39,8 @@ def plot_logs(logs, fields=('class_error', 'loss_bbox_unscaled', 'mAP'), ewm_col
     # Quality checks - verify valid dir(s), that every item in list is Path object, and that log_name exists in each dir
     for i, dir in enumerate(logs):
         if not isinstance(dir, PurePath):
-            raise ValueError(f"{func_name} - non-Path object in logs argument of {type(dir)}: \n{dir}")
+            raise ValueError(
+                f"{func_name} - non-Path object in logs argument of {type(dir)}: \n{dir}")
         if not dir.exists():
             raise ValueError(f"{func_name} - invalid directory in logs argument:\n{dir}")
         # verify log_name exists
