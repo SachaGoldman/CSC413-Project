@@ -15,6 +15,15 @@
 \usepackage{nicefrac}
 \usepackage{microtype}
 \usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{mathrsfs}
+\usepackage{graphicx}
+\usepackage{scrextend}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{bm}
 
 \title{DINO Methods for Style Transfer}
 
@@ -37,7 +46,7 @@
 	Yuchong Zhang \\
 	Department of Computer Science \\
 	Department of Mathematics \\
-	University of Toronoto \\
+	University of Toronto \\
 	Toronto, ON, M5S 1A1 \\
 	\texttt{yuchongz.zhang@mail.utoronto.ca} \\
 	\And
@@ -68,7 +77,7 @@ Style transfer is the problem of changing an image's artistic style while mainta
 
 \cite{DINO} came up with a new self-supervised learning method, named DINO (for Knowledge Distillation with No Labels) that aims to create better feature representations from its inputs by adopting a teacher-student paradigm. The student gets a difficult version (lots of augmentation) of the image while the teacher gets an easy version (minimal augmentation), and then the models are trained to aim for the same feature representation through cross entropy loss. Their experimental results found that the vision transformer's class token contained explicit information about the segmentation of objects in images, while also performing as very accurate classifiers. In this project, we aim to apply the better feature representation that the DINO method yields (over supervised vision transformers), to the domain of image style transfer.
 
-Self-supervised learning is a common technique used in style transfer, due to the obvious lack of target images available for a task of this nature. It becomes necessary to find ways for the model to supervise its own outputs. Usual methods \cite{CNNStyleTransfer} involve checking the outputs of VGG for consistency in style and context. \cite{ImageStyleTransformer} proposes using vision transformers for this task, using two transformer encoders (one for content, one for style), and one transformer decoder. Transformers have been a hot rising topic in computer vision, and they claim that their method of using transformers for style transfer results in a decrease in content leak, as well as acheives unbiased stylization.
+Self-supervised learning is a common technique used in style transfer, due to the obvious lack of target images available for a task of this nature. It becomes necessary to find ways for the model to supervise its own outfputs. Usual methods \cite{CNNStyleTransfer} involve checking the outputs of VGG for consistency in style and context. \cite{ImageStyleTransformer} proposes using vision transformers for this task, using two transformer encoders (one for content, one for style), and one transformer decoder. Transformers have been a hot rising topic in computer vision, and they claim that their method of using transformers for style transfer results in a decrease in content leak, as well as achieves unbiased stylization.
 
 It becomes integral for there to be good feature representations of the content and style to construct a good style-transferred image. We believe that making use of pretrained DINO ViT models, as well as using the DINO method itself during training, can help achieve this.
 
@@ -78,14 +87,25 @@ It becomes integral for there to be good feature representations of the content 
 
 The DINO paper provided their Vision Transformers that were trained using their proposed method. We attempted to use these models as a starting point for the content and style encoders of the model in three different ways: A) Freezing the weights for both the content and style encoders, B) Freezing only the weights for the content encoder, and C) letting both the content and style encoders train with the rest of the network.
 
-
 \subsection{DINO Training for Encoders}
 
-For the purpose of DINO training we add a teacher content encoder and a teacher style encoder. Now, as in the DINO method, the content and style transformers are given distorted versions of the images (possibly only cropped and flipped to avoid abstracting the incorrect style characteristics), and the teachers are given the unmodified images. We then add together the loss from the standard style transfer and the cross entropy loss between the teacher encodings and the student encodings. This forces the students to learn distillations of the original images. We expect this to work better for the style encoder, because style is a global property of an image, so we may only apply this method for the style encoder.
+To translate the success of DINO training on classification to style transfer we modify our algorithm and architecture. Now instead of simple a style encoder, there is a teacher style encoder $SE_t$ and a student style encoder $SE_s$, both using the architecture from $\cite{ImageStyleTransformer}$. This forces the students to learn distillations of the original images. Because style is a global property of an image, we applied this only to the style encoder and left the content encoder $CE$ as in $\cite{ImageStyleTransformer}$. 
 
-\subsection{Modified DINO Training for Encoders}
+To train this model, as in the \cite{DINO}, from the original style image we generate two slightly modified global views of the image $(I_s)^g_1$ and $(I_s)^g_2$ as well as a collection more heavily modified local views, with the set of all views denoted $V$. The student is passed all the views whereas the teacher is only passed the global views. We then calculate 
+\begin{align}
+	\mathcal L_d &= \sum_{I \in \{(I_s)^g_1, (I_s)^g_2\}} \sum_{I' \in V - \{ I \}} H(SE_t(I), SE_s(I'))
+\end{align} 
+Where $H(a,b) = -a \log (b)$. This loss is what forces our student style encoder to learn these distilled representations. We can average $SE_s((I_s)^g_1)$ and $SE_s(I_s)^g_2$ to get the encoded style, and we can take $CE(I_c)$ to get the content. From this we can generate $I_o$, the output image, using the decoder $D$. We can also pass the style to both inputs of $D$ to get $I_{ss}$ and similarly we get $I_{cc}$. Now we can use $\mathcal L_c$, $\mathcal L_s$, $\mathcal L_{id1}$,$\mathcal L_{id2}$ from $\cite{ImageStyleTransformer}$. We can then combine these into the final loss
+\begin{align}
+	\mathcal L &= \lambda_d \mathcal L_d + \lambda_c \mathcal L_c + \lambda_s \mathcal L_s + \lambda_{id1} \mathcal L_{id1} + \lambda_{id2} \mathcal L_{id2}
+\end{align}
+where the $\lambda$'s are weightings. We call this model D). 
 
-This method is similar to the previous, except that instead of taking the cross entropy between the encodings, we take apply the decoder transformer to the encodings from both the teacher and student encoders, which would yield a teacher image and a student image. We then use the distance between the teacher image and the student image in our loss. The precise distance metric used here is to be determined through experimentation. This will allow the encoders to distill the important pieces of the stylized image. This method may suffer from being very expensive to train. We also may only apply this to the style encoder.
+We also define model E) where we modify (1) to
+\begin{align}
+	\mathcal L_d &= \sum_{I \in \{(I_s)^g_1, (I_s)^g_2\}} \sum_{I' \in V - \{ I \}} H(D(SE_t(I), CE(I_c)), D(SE_s(I'), CE(I_c))).
+\end{align}
+Where calculating the loss after the decoder should weight the most relevant student and teacher differences higher.
 
 \section{Experiments}
 
@@ -102,8 +122,6 @@ Experiment C failed to learn style transfer. At the beginning of the training, i
 During its training process, experiment D seems to be slowly learning to replicate the content image while not paying much attention to the style image. The resulting outputs started as poor-quality content images, but they slowly converged to the content images with some occasional color losses. We see the content loss slowly decreases as training progresses while the style loss oscilates and shows no signs of improvement.
 
 Finally, experiment E also failed. In early stages of the training, the model renders the content with many colored vertical strips and many features were lost. Eventually, the model started to output single-color images. We see no improvements in the style loss while the content loss abruptly drops at around 250k epochs when the model outputs became mostly single-colored images, then the content loss starts to oscillate again.
-
-
 \subsection{Comparisons with SOTA Methods}
 
 \subsubsection{Timing Information}
@@ -111,7 +129,6 @@ Finally, experiment E also failed. In early stages of the training, the model re
 \subsubsection{Qualitative Evaluation}
 
 \subsubsection{Quantitative Evaluation}
-
 
 \section{Conclusion}
 
