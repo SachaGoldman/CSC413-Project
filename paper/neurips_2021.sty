@@ -55,7 +55,7 @@
 % change this every year for notice string at bottom
 \newcommand{\@neuripsordinal}{35th}
 \newcommand{\@neuripsyear}{2021}
-\newcommand{\@neuripslocation}{Sydney, Australia}
+\newcommand{\@neuripslocation}{virtual}
 
 % acknowledgments
 \usepackage{environ}
@@ -74,7 +74,7 @@
   \if@neuripsfinal
     \newcommand{\@noticestring}{%
       \@neuripsordinal\/ Conference on Neural Information Processing Systems
-      (NeurIPS \@neuripsyear), \@neuripslocation.%
+      (NeurIPS \@neuripsyear).%, \@neuripslocation.%
     }
   \else
     \newcommand{\@noticestring}{%
@@ -86,7 +86,7 @@
     \NewEnviron{hide}{}
     \let\ack\hide
     \let\endack\endhide
-    
+
     % line numbers for submission
     \RequirePackage{lineno}
     \linenumbers
