@@ -186,7 +186,7 @@ class StyTrans(nn.Module):
             nn.Conv2d(64, 3, (3, 3)),
         )
 
-    def forward(self, samples_c: NestedTensor, samples_s: NestedTensor, skip_c_encoder=False, skip_s_encoder=True):
+    def forward(self, samples_c: NestedTensor, samples_s: NestedTensor, skip_c_encoder=False, skip_s_encoder=False):
         """
         The forward expects a NestedTensor, which consists of:
             - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
