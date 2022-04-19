@@ -116,15 +116,12 @@ all the images are randomly cropped into a fixed resolution of 256 x 256, while 
 \subsection{Qualitative Evaluation}
 
 \begin{center}
+\begin{figure}
 \includegraphics[width=14cm]{comparison}	
 \caption{Style transfer results across different experiments.}
 \label{comparison}
-\end{center}
-
-\begin{figure}
-	\includegraphics[scale=0.35]{comparison}
-
 \end{figure}
+\end{center}
 
 In both experiments A and B, we can see that as training progresses, the model gradually learns to render the content image to the style of the style image. But in both cases, certain details of the objects depicted in the content image are lost. Experiment A seems to have less feature losses while experiment B produces style-transferred images that are closer to what the original style transferer produces (columns A, B, Original, figure \ref{comparison}). For experiment A, we can see both the content and style losses decrease over time. Meanwhile, experiment B has a decreasing style loss but its content loss first decreases and then increases before oscilating more.
 
