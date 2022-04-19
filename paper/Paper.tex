@@ -89,13 +89,13 @@ The DINO paper provided their Vision Transformers that were trained using their 
 
 \subsection{DINO Training for Encoders}
 
-To translate the success of DINO training on classification to style transfer we modify our algorithm and architecture. Now instead of simple a style encoder, there is a teacher style encoder $SE_t$ and a student style encoder $SE_s$, both using the architecture from $\cite{ImageStyleTransformer}$. This forces the students to learn distillations of the original images. Because style is a global property of an image, we applied this only to the style encoder and left the content encoder $CE$ as in $\cite{ImageStyleTransformer}$. 
+To translate the success of DINO training on classification to style transfer we modify our algorithm and architecture. Now instead of simple a style encoder, there is a teacher style encoder $SE_t$ and a student style encoder $SE_s$, both using the architecture from \cite{ImageStyleTransformer}. This forces the students to learn distillations of the original images. Because style is a global property of an image, we applied this only to the style encoder and left the content encoder $CE$ as in \cite{ImageStyleTransformer}. 
 
 To train this model, as in the \cite{DINO}, from the original style image we generate two slightly modified global views of the image $(I_s)^g_1$ and $(I_s)^g_2$ as well as a collection more heavily modified local views, with the set of all views denoted $V$. The student is passed all the views whereas the teacher is only passed the global views. We then calculate 
 \begin{align}
 	\mathcal L_d &= \sum_{I \in \{(I_s)^g_1, (I_s)^g_2\}} \sum_{I' \in V - \{ I \}} H(SE_t(I), SE_s(I'))
 \end{align} 
-Where $H(a,b) = -a \log (b)$. This loss is what forces our student style encoder to learn these distilled representations. We can average $SE_s((I_s)^g_1)$ and $SE_s(I_s)^g_2$ to get the encoded style, and we can take $CE(I_c)$ to get the content. From this we can generate $I_o$, the output image, using the decoder $D$. We can also pass the style to both inputs of $D$ to get $I_{ss}$ and similarly we get $I_{cc}$. Now we can use $\mathcal L_c$, $\mathcal L_s$, $\mathcal L_{id1}$,$\mathcal L_{id2}$ from $\cite{ImageStyleTransformer}$. We can then combine these into the final loss
+Where $H(a,b) = -a \log (b)$. This loss is what forces our student style encoder to learn these distilled representations. We can average $SE_s((I_s)^g_1)$ and $SE_s(I_s)^g_2$ to get the encoded style, and we can take $CE(I_c)$ to get the content. From this we can generate $I_o$, the output image, using the decoder $D$. We can also pass the style to both inputs of $D$ to get $I_{ss}$ and similarly we get $I_{cc}$. Now we can use $\mathcal L_c$, $\mathcal L_s$, $\mathcal L_{id1}$,$\mathcal L_{id2}$ from \cite{ImageStyleTransformer}. We can then combine these into the final loss
 \begin{align}
 	\mathcal L &= \lambda_d \mathcal L_d + \lambda_c \mathcal L_c + \lambda_s \mathcal L_s + \lambda_{id1} \mathcal L_{id1} + \lambda_{id2} \mathcal L_{id2}
 \end{align}
@@ -138,12 +138,5 @@ Finally, experiment E also failed. In early stages of the training, the model re
 \nocite{*}
 
 \bibliography{bib}
-
-\appendix
-
-\section{Appendix}
-
-Optionally include extra information (complete proofs, additional experiments and plots) in the appendix.
-This section will often be part of the supplemental material.
 
 \end{document}
