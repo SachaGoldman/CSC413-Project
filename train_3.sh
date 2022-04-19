@@ -17,4 +17,4 @@ python ./train.py \
     --dino_c_encoder_training False \
     --dino_s_encoder_training True \
     --dino_encoder_loss embedded \
-    --args.save_img_interval 100
+    --save_img_interval 100
