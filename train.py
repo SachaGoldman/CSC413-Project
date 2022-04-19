@@ -229,6 +229,9 @@ if __name__ == '__main__':
         starting with the default value of 0.04 and increase this slightly if needed.""")
     parser.add_argument('--warmup_teacher_temp_epochs', default=0, type=int,
                         help='Number of warmup epochs for the teacher temperature (Default: 30).')
+    parser.add_argument('--momentum_teacher', default=0.996, type=float, help="""Base EMA
+        parameter for teacher update. The value is increased to 1 during training with cosine schedule.
+        We recommend setting a higher value with small batches: for example use 0.9995 with batch size of 256.""")
 
     # Multi-crop parameters
     parser.add_argument('--global_crops_scale', type=float, nargs='+', default=(0.4, 1.),
@@ -284,6 +287,9 @@ if __name__ == '__main__':
 
     student_encoder_c = network.transformer.encoder_c
     student_encoder_s = network.transformer.encoder_s
+
+    momentum_schedule = utils.cosine_scheduler(args.momentum_teacher, 1,
+                                               args.max_iter, args.batch_size)
 
     # ==== flags to indicate whether encoders should be skipped when using network
     skip_s_encoder = False
@@ -546,6 +552,12 @@ if __name__ == '__main__':
             if i % args.gradient_accum_steps == 0:
                 optimizer.step()
                 optimizer.zero_grad()
+        
+        with torch.no_grad():
+            it = i + i * args.batch_size
+            m = momentum_schedule[i]  # momentum parameter
+            for param_q, param_k in zip(student_encoder_s.parameters(), teacher_encoder_s.parameters()):
+                param_k.data.mul_(m).add_((1 - m) * param_q.detach().data)
 
         print("Loss:", loss.cpu().detach().numpy() * args.gradient_accum_steps, "-content:", loss_c.sum().cpu().detach().numpy(),
               "-style:", loss_s.sum().cpu().detach().numpy(), "-l1:", l_identity1.sum(

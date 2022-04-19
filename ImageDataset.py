@@ -4,6 +4,7 @@ from glob import glob
 import torch.utils.data as data
 from PIL import Image
 from torchvision import transforms
+import util.dino_utils as utils
 
 
 def train_transform():
