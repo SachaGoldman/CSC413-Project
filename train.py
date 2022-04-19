@@ -19,10 +19,8 @@ from tqdm import tqdm
 
 import models.StyTR as StyTR
 import util.dino_utils as utils
-import vision_transformer as vits
 from function import calc_mean_std, normal, normal_style
-from ImageDataset import ImageDataset, train_transform
-from main_dino import DataAugmentationDINO
+from ImageDataset import ImageDataset, train_transform, DataAugmentationDINO
 from models.transformer import Transformer, TransformerEncoder
 from sampler import InfiniteSamplerWrapper
 from util.misc import nested_tensor_from_tensor_list
