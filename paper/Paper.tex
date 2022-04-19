@@ -110,8 +110,8 @@ Hoping that calculating the loss after the decoder will weigh the most relevant 
 
 \subsection{Implementation Details}
 
-MS-COCO [cite] is used as the content dataset and WikiArt [cite] is used as the style dataset. In the training stage,
-all the images are randomly cropped into a fixed resolution of 256 x 256, while any image resolution is supported at the test time. We used the Adam optimizer [cite] and a warm-up adjustment strategy [cite] is used. Our GPU is not as big as the one used in the original paper, so while we could not train with their batch size, we modified the learning rate decay, number of iterations trained, and gradient accumulation steps to mimic the original's training process of a batch size of 8 for 160,000 iterations. Gradients are also clipped to a maximum norm of 10 to prevent exploding gradients.
+MS-COCO \cite{COCO} is used as the content dataset and WikiArt \cite{Wikiart} is used as the style dataset. In the training stage,
+all the images are randomly cropped into a fixed resolution of 256 x 256, while any image resolution is supported at the test time. We used the Adam optimizer \cite{Adam} and a warm-up adjustment strategy \cite{Warmup} is used. Our GPU is not as big as the one used in the original paper, so while we could not train with their batch size, we modified the learning rate decay, number of iterations trained, and gradient accumulation steps to mimic the original's training process of a batch size of 8 for 160,000 iterations. Gradients are also clipped to a maximum norm of 10 to prevent exploding gradients.
 
 \subsection{Qualitative Evaluation}
 
