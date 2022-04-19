@@ -72,17 +72,12 @@ Self-supervised learning is a common technique used in style transfer, due to th
 
 It becomes integral for there to be good feature representations of the content and style to construct a good style-transferred image. We believe that making use of pretrained DINO ViT models, as well as using the DINO method itself during training, can help achieve this.
 
-\section{Method}
+\section{Methods}
 
-We have four different ideas for bringing the success of the DINO method to the style transfer task.
+\subsection{DINO Pretrained ViT Content Encoder}
 
-\subsection{Frozen DINO Content Encoder}
+The DINO paper provided their Vision Transformers that were trained using their proposed method. We attempted to use these models as a starting point for the content and style encoders of the model in three different ways: A) Freezing the weights for both the content and style encoders, B) Freezing only the weights for the content encoder, and C) letting both the content and style encoders train with the rest of the network.
 
-We initialize the content encoder with the DINO pretrained vision transformer and freeze its weights. Then we train the style encoder and decoder using the regular style transfer training paradigm from \cite{ImageStyleTransformer}. The idea being that the DINO model's robust feature vectors may act as powerful abstractions of the content of the images, that can be used for creating a new stylized image.
-
-\subsection{Initial Pretrained DINO Content Encoder}
-
-We initialize the content encoder with the DINO pretrained vision transformer, but we run the style transfer training paradigm on both encoders and the decoder. We expect this to converge to a different optima because transformers have many local optima. We hope that the robust abstractions from the DINO training process lead to better style transfer after training.
 
 \subsection{DINO Training for Encoders}
 
