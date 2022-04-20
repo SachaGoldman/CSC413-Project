@@ -13,7 +13,7 @@
 **.nfs**
 venv
 .ipynb_checkpoints/
-
+TrainingFiles
 weights
 datasets
 experiment*
