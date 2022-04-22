@@ -62,10 +62,13 @@
 \maketitle
 
 \begin{abstract}
+	
 We apply DINO \cite{DINO}, a self-supervised learning method that captures feature representations of input images, to style transfer by extending StyTr2 \cite{ImageStyleTransformer}, a style transfer transformer that renders images with artistic style, and explore the nature and robustness of the resulting model. We explore using the vision transformers pretrained with the DINO method to encode image style, and we also explore apply the DINO training methods directly to StyTr2. We discuss the relative qualitative and quantitative performance of our new models compared to the state of the art.
+
 \end{abstract}
 
 \section{Introduction}
+
 Style transfer is the problem of changing an image's artistic style while maintaining its ``content'', namely the object it depicts. Conventional models use a CNN to extract features from an image, take in another image indicating the desired artistic style, and attempt to apply that style to the features of the original input image. However, it has been shown that due to the locality resulting from shared weights, CNN based models struggle to capture the global information of input images and suffer from feature losses \cite{ImageStyleTransformer}. To resolve these issues, models that use transformers instead of CNNs for feature and style extraction have been proposed and show better results, like StyTr2 \cite{ImageStyleTransformer}. This model takes in a content image and a style image, then uses two transformer encoders to capture the content and style, then renders the content with that style using a transformer decoder. In our project, we will substitute the DINO method and models from \cite{DINO} for the encoder components and explore the effects on style transfer. The DINO method is good at extracting content even if the input images are distorted or partial, so in particular, we will implement the models and conduct experiments to explore the following questions:
 \begin{enumerate}
 	\item Does DINO's ability to capture an image's global property from local pieces give it more robustness as a style encoder?
@@ -76,7 +79,7 @@ Style transfer is the problem of changing an image's artistic style while mainta
 
 \cite{DINO} came up with a new self-supervised learning method, named DINO (for Knowledge Distillation with No Labels) that aims to create better feature representations from its inputs by adopting a teacher-student paradigm. The student gets multiple difficult views (lots of augmentation), called the local views of the image while the teacher gets an easy view (minimal augmentation), called the global view. Then the student is trained to aim for the same feature representation through cross entropy loss. Their experimental results found that the vision transformer's class token contained explicit information about the segmentation of objects in images, while also performing as very accurate classifiers. In this project, we aim to apply the better feature representation that the DINO method yields (over supervised vision transformers), to the domain of image style transfer.
 
-Self-supervised learning is a common technique used in style transfer, due to the obvious lack of target images available for a task of this nature. It becomes necessary to find ways for the model to supervise its own outputs. Usual methods \cite{CNNStyleTransfer} involve checking the outputs of VGG for consistency in style and context. \cite{ImageStyleTransformer} proposes using vision transformers for this task, using two transformer encoders (one for content, one for style), and one transformer decoder. Transformers have been a hot rising topic in computer vision, and they claim that their method of using transformers for style transfer results in decreased content leak, as well as achieving unbiased stylization.
+Self-supervised learning is a common technique used in style transfer, due to the obvious lack of target images available for a task of this nature. It becomes necessary to find ways for the model to supervise its own outputs. Usual methods \cite{CNNStyleTransfer} \cite{ContentBlock} \cite{CycleGAN} involve checking the outputs of VGG for consistency in style and context. \cite{ImageStyleTransformer} proposes using vision transformers for this task, using two transformer encoders (one for content, one for style), and one transformer decoder. Transformers have been a hot rising topic in computer vision, and they claim that their method of using transformers for style transfer results in decreased content leak, as well as achieving unbiased stylization.
 
 It is integral for there to be good feature representations of the content and style to construct a good style-transferred image. We believe that making use of pretrained DINO ViT models, as well as using the DINO method itself during training, can help achieve this.
 
@@ -84,7 +87,7 @@ It is integral for there to be good feature representations of the content and s
 
 \subsection{DINO Pretrained ViT Content Encoder}
 
-The DINO paper provided their Vision Transformers that were trained using their proposed method. We attempted to use these models as a starting point for the content and style encoders of the model in three different ways: A) Freezing the weights for both the content and style encoders, B) Freezing only the weights for the content encoder, and C) letting both the content and style encoders train with the rest of the network. By using the pretrained DINO ViT as a starting point, we hope to make use of the robust features this model has already learnt. 
+The DINO paper provided their Vision Transformers that were trained using their proposed method. We attempted to use these models as a starting point for the content and style encoders of the style transfer transformer model in three different ways: A) Freezing the weights for both the content and style encoders, B) Freezing only the weights for the content encoder, and C) letting both the content and style encoders train with the rest of the network. By using the pretrained DINO ViT as a starting point, we hope to make use of the robust features this model has already learnt. 
 
 \subsection{DINO Training the Style Encoder}
 
@@ -149,16 +152,14 @@ Finally, experiment E also failed. In early stages of the training, the model re
 	\end{tabular}
 \end{table}
 
-We created a small dataset of 100 randomly selected images from the content and style dataset, and pair them together to compute the average of the four loss terms above. All images are resized to 512 x 512 resolution. The DINO loss is left out because it is specifically between its student and teacher, and so is not relevant to performance. Overall, our experiment D had the best content loss and identity loss 2, although that is not particularly significant because experiment D only learnt how to copy the content image. Experiment A and B were the only models that successfully learned how to perform style transfer, and of the two models, only experiment B's identity loss 1 was better than the original model. This most likely speaks to experiment B's ability to recreate key parts of the image is better than the original papers, which probably springs from the original DINO training method's robust nature. 
+We created a small dataset of 100 randomly selected images from the content and style dataset, and pair them together, then pass them through each of our experiment models as well as the trained model from the original paper to compute the average of the four loss terms above. All images are resized to 512 x 512 resolution to avoid irregularities that occur from WikiArt images being much higher resolution than COCO images. The DINO loss is left out because it is specifically between its student and teacher, and so is not relevant to performance. 
+
+Experiment A and B were the only models that successfully learned how to perform style transfer, and of the two models, only experiment B's identity loss 1 was better than the original model. This most likely speaks to experiment B's ability to recreate key parts of the image is better than the original papers, which probably springs from the original DINO training method's robust nature. Overall, our experiment D had the best content loss and identity loss 2, although that is not particularly significant because experiment D only learnt how to copy the content image. While this reflects badly on the results of experiment D, it does perhaps speak to the DINO training method having some applications in autoencoders. Experiments C and E both got stuck at bad local minima, so they achieve bad overall loss.
+
 
 \section{Conclusion}
 
-In this paper we have shown that the transformers already trained using DINO are very useful, and we used them to achieve strong style transfer results. We also saw that the DINO training method is very sensitive, and difficult to apply to new contexts. It could be attributed to the nature of the style transfer task itself coupled with the volatile parts of self-supervised learning that caused training to explode and crash at bad local minima in many of our experiments. Recreating content has also been a much easier task than recreating style, as many of our failed experiments still leaned towards achieving better content loss through any means necessary, even if it was completely recreating the content image.
-
-
-
-In future we hope to see attempts to apply this training method to other areas of computer vision, and we also hope to gain more theoretical understanding of why DINO works in some scenarios, but fails in others. 
-
+In this paper we have shown that the transformers already trained using DINO are very useful, and we used them to achieve strong style transfer results. We also saw that the DINO training method is very sensitive, and difficult to apply to new contexts. It could be attributed to the nature of the style transfer task itself coupled with the volatile parts of self-supervised learning that caused training to explode and crash at bad local minima in many of our experiments. Recreating content has also been a much easier task than recreating style, as many of our failed experiments still leaned towards achieving better content loss through any means necessary, even if it was completely recreating the content image. In future we hope to see attempts to apply this training method to other areas of computer vision, and we also hope to gain more theoretical understanding of why DINO works in some scenarios, but fails in others.
 
 
 
@@ -168,6 +169,8 @@ In future we hope to see attempts to apply this training method to other areas o
 
 
 \let\thefootnote\relax\footnotetext{We have made our code freely available at: \href{https://github.com/SachaGoldman/CSC413-Project}{https://github.com/SachaGoldman/CSC413-Project}}
+
+\newpage
 
 % Our current sources
 \nocite{*}
