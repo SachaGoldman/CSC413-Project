@@ -10,6 +10,7 @@
 **.aux
 **.gz
 **.zip
+**.note
 **.nfs**
 venv
 .ipynb_checkpoints/
